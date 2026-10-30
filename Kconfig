@@ -1,0 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Zephyr module Kconfig entry point (see zephyr/module.yml).
+
+rsource "lib/Kconfig"

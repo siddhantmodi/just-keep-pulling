@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# This repo is a Zephyr module, so its shared libraries (lib/), custom boards
+# and devicetree bindings are available to every app in it (app_main/, tests,
+# future factory/calibration apps) without per-app path wiring.
+name: just_keep_pulling
+build:
+  cmake: .
+  kconfig: Kconfig
+  settings:
+    board_root: .
+    dts_root: .

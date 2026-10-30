@@ -1,0 +1,169 @@
+# Formatting for this repo's C/C++ sources (app_main/, lib/). Dependencies under
+# deps/ keep their own .clang-format. Check with scripts/check_format.sh.
+
+BasedOnStyle: LLVM
+IndentWidth: 4
+---
+Language: Cpp
+
+AccessModifierOffset: -4
+AlignAfterOpenBracket: true
+AlignConsecutiveAssignments: false
+AlignConsecutiveDeclarations: false
+AlignConsecutiveMacros: true
+AlignEscapedNewlines: Left
+AlignOperands: true
+AlignTrailingComments: true
+AllowAllParametersOfDeclarationOnNextLine: true
+AllowShortEnumsOnASingleLine: false
+AllowShortBlocksOnASingleLine: false
+AllowShortCaseLabelsOnASingleLine: false
+AllowShortFunctionsOnASingleLine: None
+AllowShortIfStatementsOnASingleLine: false
+AllowShortLoopsOnASingleLine: false
+AlwaysBreakAfterDefinitionReturnType: None
+AlwaysBreakAfterReturnType: None
+AlwaysBreakBeforeMultilineStrings: false
+AlwaysBreakTemplateDeclarations: true
+BinPackArguments: true
+BinPackParameters: true
+BraceWrapping:
+  AfterCaseLabel: true
+  AfterClass: true
+  AfterControlStatement: false
+  AfterEnum: false
+  AfterExternBlock: true
+  AfterFunction: true
+  AfterNamespace: true
+  AfterObjCDeclaration: true
+  AfterStruct: false
+  AfterUnion: false
+  BeforeCatch: true
+  BeforeLambdaBody: true
+  BeforeElse: false
+  IndentBraces: false
+  SplitEmptyFunction: true
+  SplitEmptyRecord: true
+  SplitEmptyNamespace: false
+BreakBeforeBinaryOperators: None
+BreakBeforeBraces: Custom
+BreakBeforeInheritanceComma: false
+BreakBeforeTernaryOperators: true
+BreakConstructorInitializersBeforeComma: true
+BreakConstructorInitializers: BeforeColon
+BreakAfterJavaFieldAnnotations: false
+BreakStringLiterals: true
+ColumnLimit: 150
+CommentPragmas: "^ IWYU pragma:"
+CompactNamespaces: false
+ConstructorInitializerAllOnOneLineOrOnePerLine: false
+ConstructorInitializerIndentWidth: 4
+ContinuationIndentWidth: 4
+Cpp11BracedListStyle: true
+DerivePointerAlignment: false
+DisableFormat: false
+ExperimentalAutoDetectBinPacking: false
+FixNamespaceComments: true
+ForEachMacros:
+- foreach
+- Q_FOREACH
+- BOOST_FOREACH
+- 'FOR_EACH'
+- 'FOR_EACH_FIXED_ARG'
+- 'FOR_EACH_IDX'
+- 'FOR_EACH_IDX_FIXED_ARG'
+- 'FOR_EACH_NONEMPTY_TERM'
+- 'RB_FOR_EACH'
+- 'RB_FOR_EACH_CONTAINER'
+- 'SYS_DLIST_FOR_EACH_CONTAINER'
+- 'SYS_DLIST_FOR_EACH_CONTAINER_SAFE'
+- 'SYS_DLIST_FOR_EACH_NODE'
+- 'SYS_DLIST_FOR_EACH_NODE_SAFE'
+- 'SYS_SFLIST_FOR_EACH_CONTAINER'
+- 'SYS_SFLIST_FOR_EACH_CONTAINER_SAFE'
+- 'SYS_SFLIST_FOR_EACH_NODE'
+- 'SYS_SFLIST_FOR_EACH_NODE_SAFE'
+- 'SYS_SLIST_FOR_EACH_CONTAINER'
+- 'SYS_SLIST_FOR_EACH_CONTAINER_SAFE'
+- 'SYS_SLIST_FOR_EACH_NODE'
+- 'SYS_SLIST_FOR_EACH_NODE_SAFE'
+- '_WAIT_Q_FOR_EACH'
+- 'Z_FOR_EACH'
+- 'Z_FOR_EACH_ENGINE'
+- 'Z_FOR_EACH_EXEC'
+- 'Z_FOR_EACH_FIXED_ARG'
+- 'Z_FOR_EACH_FIXED_ARG_EXEC'
+- 'Z_FOR_EACH_IDX'
+- 'Z_FOR_EACH_IDX_EXEC'
+- 'Z_FOR_EACH_IDX_FIXED_ARG'
+- 'Z_FOR_EACH_IDX_FIXED_ARG_EXEC'
+- 'Z_GENLIST_FOR_EACH_CONTAINER'
+- 'Z_GENLIST_FOR_EACH_CONTAINER_SAFE'
+- 'Z_GENLIST_FOR_EACH_NODE'
+- 'Z_GENLIST_FOR_EACH_NODE_SAFE'
+IncludeBlocks: Regroup
+IncludeCategories:
+  - Regex: '^"'
+    Priority: 1
+  - Regex: '^<zephyr/'
+    Priority: 2
+  - Regex: '^<'
+    Priority: 3
+IncludeIsMainRegex: "(Test)?$"
+IndentCaseLabels: false
+IndentCaseBlocks: false
+IndentExternBlock: false
+IndentPPDirectives: None
+IndentWidth: 4
+IndentWrappedFunctionNames: false
+JavaScriptQuotes: Leave
+JavaScriptWrapImports: true
+KeepEmptyLinesAtTheStartOfBlocks: true
+MacroBlockBegin: ""
+MacroBlockEnd: ""
+MaxEmptyLinesToKeep: 1
+NamespaceIndentation: None
+ObjCBlockIndentWidth: 4
+ObjCSpaceAfterProperty: false
+ObjCSpaceBeforeProtocolList: true
+PenaltyBreakAssignment: 2
+PenaltyBreakBeforeFirstCallParameter: 19
+PenaltyBreakComment: 300
+PenaltyBreakFirstLessLess: 120
+PenaltyBreakString: 1000
+PenaltyExcessCharacter: 1000000
+PenaltyReturnTypeOnItsOwnLine: 60
+PointerAlignment: Right
+#RawStringFormats:
+#  - Delimiter:       pb
+#    Language:        TextProto
+#    BasedOnStyle:    google
+ReflowComments: false
+SortIncludes: CaseSensitive
+SortUsingDeclarations: true
+SpaceAfterCStyleCast: false
+SpaceAfterTemplateKeyword: false
+SpaceBeforeAssignmentOperators: true
+SpaceBeforeParens: Never
+SpaceInEmptyParentheses: false
+SpacesBeforeTrailingComments: 1
+SpacesInAngles: false
+SpacesInContainerLiterals: false
+SpacesInCStyleCastParentheses: false
+SpacesInParentheses: true
+SpacesInSquareBrackets: false
+Standard: Latest
+TabWidth: 8
+UseTab: Never
+---
+Language: ObjC
+DisableFormat: true
+---
+Language: Proto
+DisableFormat: true
+---
+Language: TableGen
+DisableFormat: true
+---
+Language: TextProto
+DisableFormat: true

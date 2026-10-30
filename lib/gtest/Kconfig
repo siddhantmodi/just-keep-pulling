@@ -1,0 +1,19 @@
+# SPDX-License-Identifier: Apache-2.0
+
+config GTEST
+	bool "GoogleTest/GoogleMock unit test framework"
+	depends on CPP
+	select REQUIRES_FULL_LIBCPP
+	select TEST
+	help
+	  Compile GoogleTest + GoogleMock (the 'googletest' west project) into
+	  the image. Intended for native_sim unit tests run through Twister's
+	  gtest harness. Not for production firmware images.
+
+config GTEST_MAIN
+	bool "Provide a GoogleTest main() entry point"
+	depends on GTEST
+	default y
+	help
+	  Provide main() that initializes GoogleMock and runs all tests.
+	  Disable to supply your own entry point.

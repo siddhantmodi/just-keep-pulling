@@ -1,0 +1,146 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Jobs run in the devcontainer image. The repo is checked out at the job
+# workspace and its parent directory is the west topdir (see setup-west).
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NATIVE_BOARD: native_sim/native/64
+
+jobs:
+  format:
+    name: Format and layering
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/siddhantmodi/zephyr-dev-nordic:zsdk_v1.0.1
+      options: --user root
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Trust the checkout
+        run: git config --global --add safe.directory '*'
+
+      - name: Check formatting
+        run: scripts/check_format.sh
+
+      - name: Check layering
+        run: scripts/check_layering.sh
+
+  unit:
+    name: Unit tests (GoogleTest / native_sim)
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/siddhantmodi/zephyr-dev-nordic:zsdk_v1.0.1
+      options: --user root
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: ./.github/actions/setup-west
+
+      - name: Run unit tests with coverage and sanitizers
+        run: |
+          west twister \
+            -T . \
+            -p "$NATIVE_BOARD" \
+            --tag unit \
+            --coverage \
+            --coverage-tool gcovr \
+            --coverage-basedir . \
+            --enable-asan \
+            --enable-ubsan \
+            --inline-logs \
+            -v \
+            --outdir twister-unit
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: unit-test-results
+          path: |
+            twister-unit/twister.xml
+            twister-unit/twister.json
+            twister-unit/twister.log
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: unit-test-coverage
+          path: twister-unit/coverage/
+
+  tidy:
+    name: clang-tidy (${{ matrix.app }})
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/siddhantmodi/zephyr-dev-nordic:zsdk_v1.0.1
+      options: --user root
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [app_main]
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: ./.github/actions/setup-west
+
+      - name: Build with clang and run clang-tidy
+        run: scripts/run_clang_tidy.py --app ${{ matrix.app }} --board "$NATIVE_BOARD"
+
+  build:
+    name: Build ${{ matrix.app }} (${{ matrix.board }})
+    needs: [format, unit, tidy]
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/siddhantmodi/zephyr-dev-nordic:zsdk_v1.0.1
+      options: --user root
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - app: app_main
+            board: nrf54l15dk/nrf54l15/cpuapp
+            board_name: nrf54l15dk
+    env:
+      BUILD_DIR: build/${{ matrix.app }}-${{ matrix.board_name }}
+      ARTIFACT_PREFIX: ${{ matrix.app }}-${{ matrix.board_name }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: ./.github/actions/setup-west
+
+      - name: Build firmware
+        run: west build -p always -b ${{ matrix.board }} -d "$BUILD_DIR" ${{ matrix.app }}
+
+      - name: Collect firmware artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          image="$BUILD_DIR/${{ matrix.app }}/zephyr"
+          mkdir -p artifacts
+          # Only multi-image builds (e.g. with MCUboot) produce a merged.hex.
+          if [ -f "$BUILD_DIR/merged.hex" ]; then
+            cp "$BUILD_DIR/merged.hex" "artifacts/$ARTIFACT_PREFIX-merged.hex"
+          fi
+          for ext in hex bin elf; do
+            cp "$image/zephyr.$ext" "artifacts/$ARTIFACT_PREFIX.$ext"
+          done
+          cp "$image/.config" "artifacts/$ARTIFACT_PREFIX.config"
+          (cd artifacts && sha256sum -- * > SHA256SUMS)
+
+      - name: Upload firmware
+        uses: actions/upload-artifact@v7
+        with:
+          name: firmware-${{ matrix.app }}-${{ matrix.board_name }}
+          path: artifacts/*
+          if-no-files-found: error

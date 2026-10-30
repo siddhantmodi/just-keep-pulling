@@ -1,0 +1,2 @@
+# Shell scripts run inside the Linux devcontainer and break with CRLF line endings
+*.sh text eol=lf

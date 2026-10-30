@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: Apache-2.0
+
+config FW_HAL
+	bool "Hardware capability concepts (hal::)"
+	depends on FW_CPP
+	default y
+	help
+	  Header-only concepts for hardware capabilities (digital output,
+	  sensor channel, ...) with thin Zephyr implementations. Components
+	  are templates over these concepts so unit tests can inject mocks.

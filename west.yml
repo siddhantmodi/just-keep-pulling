@@ -1,0 +1,51 @@
+
+manifest:
+  remotes:
+    - name: zephyrproject-rtos
+      url-base: https://github.com/zephyrproject-rtos
+    - name: MistyWest
+      url-base: git@github.com:MistyWest
+    - name: siddhantmodi
+      url-base: https://github.com/siddhantmodi
+    - name: ncs
+      url-base: https://github.com/nrfconnect
+    - name: google
+      url-base: https://github.com/google
+
+  projects:
+    - name: nrf
+      remote: ncs
+      repo-path: sdk-nrf
+      revision: main
+      import:
+        path-prefix: deps
+        # Only fetch what a Bluetooth LE app on nRF52/nRF53/nRF54 needs. Applies to Zephyr's imports too.
+        name-allowlist:
+          # Zephyr and Cortex-M support
+          - zephyr
+          - cmsis
+          - cmsis_6
+          - picolibc
+          - segger
+          # Nordic HAL, SoftDevice Controller/MPSL and crypto (nrf_security)
+          - hal_nordic
+          - nrfxlib
+          - mbedtls
+          - oberon-psa-crypto
+          - tf-psa-crypto
+          # Bootloader and DFU (mcumgr)
+          - mcuboot
+          - zcbor
+          # Uncomment to build non-secure (/ns) board targets with TF-M
+          # - trusted-firmware-m
+          # - tf-m-tests
+          # - qcbor
+          # - t_cose
+          # - psa-arch-tests
+
+    # Test-only: GoogleTest/GMock for native_sim unit tests. Built by lib/gtest
+    # when CONFIG_GTEST=y; never linked into a board image.
+    - name: googletest
+      remote: google
+      revision: 52eb8108c5bdec04579160ae17225d66034bd723  # v1.17.0
+      path: deps/googletest

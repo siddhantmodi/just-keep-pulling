@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: Apache-2.0
+
+cmake_minimum_required(VERSION 3.20.0)
+
+find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
+project(app_main)
+
+# Application code builds warning-free; dependencies keep their own flags.
+target_compile_options(app PRIVATE -Werror)
+
+target_sources(app PRIVATE src/main.cpp)
+
+add_subdirectory_ifdef(CONFIG_APP_LED_SVC src/led_svc)

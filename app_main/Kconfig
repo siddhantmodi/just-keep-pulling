@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: Apache-2.0
+
+menu "Zephyr"
+source "Kconfig.zephyr"
+endmenu
+
+module = APP_MAIN
+module-str = app_main
+source "subsys/logging/Kconfig.template.log_config"
+
+menu "Application components"
+
+rsource "src/led_svc/Kconfig"
+
+endmenu

@@ -1,0 +1,47 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# clang-tidy config for this repo's C++23 Zephyr code. Run it with
+# scripts/run_clang_tidy.py. Allowlists a few high-signal check families and
+# turns off the ones that fire on Zephyr's macros (LOG_*, DT_*, ZBUS_*) or clash
+# with house conventions, rather than enabling '*'.
+---
+Checks: >
+  -*,
+  bugprone-*,
+  performance-*,
+  modernize-*,
+  misc-*,
+  readability-*,
+  cppcoreguidelines-init-variables,
+  cppcoreguidelines-prefer-member-initializer,
+  cppcoreguidelines-pro-type-member-init,
+  cppcoreguidelines-slicing,
+  cppcoreguidelines-virtual-class-destructor,
+  -bugprone-easily-swappable-parameters,
+  -bugprone-branch-clone,
+  -bugprone-implicit-widening-of-multiplication-result,
+  -misc-misplaced-const,
+  -misc-include-cleaner,
+  -misc-use-anonymous-namespace,
+  -misc-use-internal-linkage,
+  -misc-non-private-member-variables-in-classes,
+  -misc-header-include-cycle,
+  -modernize-use-trailing-return-type,
+  -modernize-use-nodiscard,
+  -modernize-macro-to-enum,
+  -performance-enum-size,
+  -readability-identifier-naming,
+  -readability-identifier-length,
+  -readability-magic-numbers,
+  -readability-function-cognitive-complexity,
+  -readability-implicit-bool-conversion,
+  -readability-simplify-boolean-expr,
+  -readability-redundant-member-init,
+  -readability-convert-member-functions-to-static,
+  -readability-function-size,
+  -readability-math-missing-parentheses,
+
+WarningsAsErrors: "*"
+
+# Report findings in this repo's headers too, not just the analyzed .cpp files.
+HeaderFilterRegex: "/(app_[^/]+|lib)/.*"

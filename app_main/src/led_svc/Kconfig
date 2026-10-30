@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: Apache-2.0
+
+config APP_LED_SVC
+	bool "LED service"
+	depends on GPIO && FW_HAL
+	depends on $(dt_alias_enabled,led0)
+	help
+	  Drives the board's led0 alias on/off.
+
+if APP_LED_SVC
+
+module = APP_LED_SVC
+module-str = led_svc
+source "subsys/logging/Kconfig.template.log_config"
+
+endif # APP_LED_SVC
