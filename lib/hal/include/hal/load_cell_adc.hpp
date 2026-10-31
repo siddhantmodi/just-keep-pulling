@@ -18,6 +18,12 @@
 namespace hal
 {
 
+struct LoadCellSample {
+    std::int32_t raw;
+    /** Microseconds since boot when the conversion completed (taken in its interrupt, not when read). */
+    std::uint64_t timestamp_us;
+};
+
 class ILoadCellAdc
 {
 public:
@@ -31,7 +37,10 @@ public:
      * @brief Wait up to @p timeout for the next sample. Fails with
      *        resource_unavailable_try_again on timeout and operation_not_permitted when not started.
      */
-    [[nodiscard]] virtual fw::Result<std::int32_t> read( std::chrono::microseconds timeout ) = 0;
+    [[nodiscard]] virtual fw::Result<LoadCellSample> read( std::chrono::microseconds timeout ) = 0;
+
+    /** @brief Samples overwritten before they were read, since the last start: the reader fell behind. */
+    [[nodiscard]] virtual std::uint32_t lost_samples() const = 0;
 
     /** @brief Stop converting and power down. */
     [[nodiscard]] virtual fw::Result<> stop() = 0;

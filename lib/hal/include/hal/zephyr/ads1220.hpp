@@ -50,13 +50,18 @@ public:
         return fw::err::check( ads1220_start( dev_, samples_per_second ) );
     }
 
-    [[nodiscard]] fw::Result<std::int32_t> read( std::chrono::microseconds timeout ) override
+    [[nodiscard]] fw::Result<LoadCellSample> read( std::chrono::microseconds timeout ) override
     {
-        std::int32_t raw = 0;
-        if( auto ret = fw::err::check( ads1220_read( dev_, &raw, K_USEC( timeout.count() ) ) ); !ret ) {
+        ads1220_sample sample{};
+        if( auto ret = fw::err::check( ads1220_read( dev_, &sample, K_USEC( timeout.count() ) ) ); !ret ) {
             return std::unexpected( ret.error() );
         }
-        return raw;
+        return LoadCellSample{ .raw = sample.raw, .timestamp_us = sample.ready_us };
+    }
+
+    [[nodiscard]] std::uint32_t lost_samples() const override
+    {
+        return ads1220_lost_samples( dev_ );
     }
 
     [[nodiscard]] fw::Result<> stop() override

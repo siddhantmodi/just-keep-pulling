@@ -49,6 +49,9 @@ struct ads1220_config {
 struct ads1220_data {
     struct gpio_callback drdy_cb;
     struct k_sem drdy_sem;
+    struct k_spinlock lock;
+    uint64_t ready_us; /* when the pending conversion signalled /DRDY */
+    uint32_t lost;     /* conversions overwritten before they were read, since start */
     bool started;
 };
 
@@ -131,6 +134,10 @@ int ads1220_start( const struct device *dev, uint16_t samples_per_second )
     }
 
     k_sem_reset( &data->drdy_sem );
+    K_SPINLOCK( &data->lock )
+    {
+        data->lost = 0;
+    }
     ret = send_command( dev, CMD_START );
     if( ret < 0 ) {
         return ret;
@@ -139,7 +146,7 @@ int ads1220_start( const struct device *dev, uint16_t samples_per_second )
     return 0;
 }
 
-int ads1220_read( const struct device *dev, int32_t *raw, k_timeout_t timeout )
+int ads1220_read( const struct device *dev, struct ads1220_sample *sample, k_timeout_t timeout )
 {
     struct ads1220_data *data = dev->data;
     uint8_t tx[4] = { CMD_RDATA };
@@ -153,14 +160,30 @@ int ads1220_read( const struct device *dev, int32_t *raw, k_timeout_t timeout )
     if( ret < 0 ) {
         return -EAGAIN;
     }
+    K_SPINLOCK( &data->lock )
+    {
+        sample->ready_us = data->ready_us;
+    }
     ret = transfer( dev, tx, rx, sizeof( tx ) );
     if( ret < 0 ) {
         return ret;
     }
 
     /* 24-bit two's complement, most significant byte first. */
-    *raw = sign_extend( ( (uint32_t)rx[1] << 16 ) | ( (uint32_t)rx[2] << 8 ) | rx[3], 23 );
+    sample->raw = sign_extend( ( (uint32_t)rx[1] << 16 ) | ( (uint32_t)rx[2] << 8 ) | rx[3], 23 );
     return 0;
+}
+
+uint32_t ads1220_lost_samples( const struct device *dev )
+{
+    struct ads1220_data *data = dev->data;
+    uint32_t lost = 0;
+
+    K_SPINLOCK( &data->lock )
+    {
+        lost = data->lost;
+    }
+    return lost;
 }
 
 int ads1220_stop( const struct device *dev )
@@ -178,6 +201,14 @@ static void drdy_handler( const struct device *port, struct gpio_callback *cb, u
 
     ARG_UNUSED( port );
     ARG_UNUSED( pins );
+    /* Time the conversion here, not when a thread gets round to reading it. */
+    K_SPINLOCK( &data->lock )
+    {
+        if( k_sem_count_get( &data->drdy_sem ) > 0 ) {
+            data->lost++; /* the previous conversion was never read */
+        }
+        data->ready_us = k_cyc_to_us_floor64( k_cycle_get_64() );
+    }
     k_sem_give( &data->drdy_sem );
 }
 

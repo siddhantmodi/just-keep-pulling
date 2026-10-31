@@ -80,7 +80,7 @@ TEST_F( Ads1220Test, ReadReturnsSignedTwentyFourBitSamples )
         auto sample = adc_.read( timeout );
 
         ASSERT_TRUE( sample );
-        EXPECT_EQ( *sample, raw );
+        EXPECT_EQ( sample->raw, raw );
     }
 }
 
@@ -93,8 +93,65 @@ TEST_F( Ads1220Test, ReadsEveryConversionInOrderAtFullRate )
         auto sample = adc_.read( timeout );
 
         ASSERT_TRUE( sample );
-        ASSERT_EQ( *sample, expected );
+        ASSERT_EQ( sample->raw, expected );
     }
+}
+
+TEST_F( Ads1220Test, TimestampsFollowConversionsNotReads )
+{
+    ASSERT_TRUE( adc_.start( 1000 ) );
+    auto first = adc_.read( timeout );
+    ASSERT_TRUE( first );
+
+    // Read the next conversion late: its timestamp is still when it completed.
+    k_busy_wait( 400 );
+    auto second = adc_.read( timeout );
+
+    ASSERT_TRUE( second );
+    EXPECT_EQ( second->timestamp_us - first->timestamp_us, 1000U );
+}
+
+TEST_F( Ads1220Test, TimestampsAreEvenlySpacedAtEveryRate )
+{
+    // The emulator's timer rounds its period up to whole ticks.
+    constexpr std::uint64_t tick_us = 1'000'000U / CONFIG_SYS_CLOCK_TICKS_PER_SEC;
+
+    for( std::uint16_t const rate : rates ) {
+        ASSERT_TRUE( adc_.start( rate ) ) << rate << " SPS";
+        auto first = adc_.read( timeout );
+        auto second = adc_.read( timeout );
+        ASSERT_TRUE( first && second );
+        std::uint64_t const period = second->timestamp_us - first->timestamp_us;
+        EXPECT_GE( period, 1'000'000U / rate ) << rate << " SPS";
+        EXPECT_LE( period, ( 1'000'000U / rate ) + tick_us ) << rate << " SPS";
+
+        auto previous = second;
+        for( int i = 0; i < 5; ++i ) {
+            auto sample = adc_.read( timeout );
+            ASSERT_TRUE( sample );
+            EXPECT_EQ( sample->timestamp_us - previous->timestamp_us, period ) << rate << " SPS";
+            previous = sample;
+        }
+        ASSERT_TRUE( adc_.stop() );
+    }
+}
+
+TEST_F( Ads1220Test, CountsSamplesOverwrittenBeforeBeingRead )
+{
+    ads1220_emul_set_source( emulator, ten_per_conversion, nullptr );
+    ASSERT_TRUE( adc_.start( 1000 ) );
+    ASSERT_TRUE( adc_.read( timeout ) );
+    EXPECT_EQ( adc_.lost_samples(), 0U );
+
+    k_sleep( K_USEC( 5500 ) ); // five conversions complete; only the last can be read
+    auto sample = adc_.read( timeout );
+
+    ASSERT_TRUE( sample );
+    EXPECT_EQ( adc_.lost_samples(), 4U );
+    EXPECT_EQ( sample->raw, 50 ); // the newest conversion
+
+    ASSERT_TRUE( adc_.start( 1000 ) );
+    EXPECT_EQ( adc_.lost_samples(), 0U ); // reset by start
 }
 
 TEST_F( Ads1220Test, SupportsEveryNormalModeRate )
