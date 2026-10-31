@@ -114,6 +114,7 @@ led_svc/
 4. **Production instances are `constinit`** when their dependencies are in the same file, so there is no constructor ordering between files. An instance that needs another component's accessor is built on first use instead (a function-local static, e.g. `app_manager`'s `manager()`), before any thread that uses it starts.
 5. **A component's mock ships with it** (`mocks/`), so every consumer's tests use the same one. HAL mocks live in `lib/hal/mocks`.
 6. **Logic classes are named for the thing they model**, not the component: the namespace already says which component (`led_svc::Led`, not `led_svc::LedService`).
+7. **`docs/<app>.md` holds the app's class diagram** (Mermaid, rendered by GitHub): interfaces with their methods, implementations, modules, drivers and how they connect. A commit that adds a component or changes an interface updates it.
 
 Tests construct a fresh instance per test with mocks: no singleton reset, no link-time seam. A component test builds only the logic `.cpp` files and sources the component's `Kconfig` (for its log level). A HAL implementation is tested once in `lib/hal/test` against an emulator; components never test it again.
 

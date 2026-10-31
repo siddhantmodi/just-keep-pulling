@@ -21,6 +21,7 @@ lib/
 drivers/              Repo-owned Zephyr drivers: ADS1220 load-cell ADC (+ chip emulator), emulated temperature sensor
 include/jkp/          Their headers; dts/bindings/ holds their devicetree bindings
 docs/architecture.md  Design rules, layers, why C++, and when to revisit them
+docs/app_main.md      app_main's class diagram (Mermaid): interfaces, implementations, modules, drivers
 app_main/             The dynamometer firmware (XIAO nRF54LM20A; native_sim for tests)
 app_template/         Reference app (LED + die temperature over BLE), same layout as below
   boards/             Devicetree overlays per board (aliases led0, die-temp)
