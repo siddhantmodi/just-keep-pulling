@@ -66,3 +66,13 @@ vcpkg_installed/
 # test output & cache
 Testing/
 .cache/
+
+# Twister output and CI artifacts
+twister-out*/
+twister-*/
+artifacts/
+
+# Python
+.venv/
+__pycache__/
+*.egg-info/

@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "zephyr-bumble"
+version = "0.1.0"
+description = "pytest fixtures for testing Zephyr native_sim BLE apps against a Bumble virtual central"
+requires-python = ">=3.11"
+dependencies = [
+    "bumble>=0.0.236",
+    "pytest>=8",
+    "pytest-asyncio>=1.0",
+]
+
+# Loaded automatically by pytest once installed.
+[project.entry-points.pytest11]
+zephyr_bumble = "zephyr_bumble.plugin"

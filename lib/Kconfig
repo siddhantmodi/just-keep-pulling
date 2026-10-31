@@ -1,0 +1,9 @@
+# SPDX-License-Identifier: Apache-2.0
+
+menu "just-keep-pulling libraries"
+
+rsource "fw/Kconfig"
+rsource "hal/Kconfig"
+rsource "gtest/Kconfig"
+
+endmenu

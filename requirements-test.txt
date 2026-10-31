@@ -1,0 +1,4 @@
+# Python dependencies for integration tests (Bumble virtual BLE central).
+# Installed by west_setup.sh, so the devcontainer and CI share one environment.
+bumble==0.0.236
+pytest-asyncio==1.4.1

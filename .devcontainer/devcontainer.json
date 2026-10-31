@@ -1,0 +1,90 @@
+// For format details, see https://aka.ms/vscode-remote/devcontainer.json
+{
+    "name": "just_keep_pulling",
+    "image": "ghcr.io/siddhantmodi/zephyr-dev-nordic:zsdk_v1.0.1",
+    "remoteUser": "user",
+    "updateRemoteUserUID": true,
+    "runArgs": [
+        "--group-add=dialout",
+        "--group-add=plugdev",
+        "--privileged"
+    ],
+    // https://code.visualstudio.com/remote/advancedcontainers/change-default-source-mount
+    // The repo is bind-mounted inside the west workspace, which lives on a named volume (see mounts)
+    "workspaceMount": "source=${localWorkspaceFolder},target=/home/user/workspace/${localWorkspaceFolderBasename},type=bind,consistency=cached",
+    "workspaceFolder": "/home/user/workspace",
+    "initializeCommand": "mkdir -p ${localEnv:HOME}/.claude/projects",
+    "postCreateCommand": "sudo chown $(id -u):$(id -g) /home/user/workspace /home/user/.claude/projects && ./${localWorkspaceFolderBasename}/.devcontainer/link_claude_sessions.sh && sudo chown -R $(id -u):$(id -g) /opt/python/venv && ./${localWorkspaceFolderBasename}/west_setup.sh",
+    "mounts": [
+        "source=${localWorkspaceFolderBasename}-west-${devcontainerId},target=/home/user/workspace,type=volume",
+        "source=${localEnv:HOME}/.ssh,target=/home/user/.ssh,type=bind",
+        // Claude Code login and settings are shared with the host, but each container gets its own projects
+        // (sessions) folder so containers using the same workspace path don't collide. See link_claude_sessions.sh
+        "source=${localEnv:HOME}/.claude,target=/home/user/.claude,type=bind",
+        "source=${localWorkspaceFolderBasename}-claude-projects-${devcontainerId},target=/home/user/.claude/projects,type=volume",
+        "source=${localEnv:HOME}/.claude/projects,target=/home/user/.claude-host-projects,type=bind",
+        "source=/dev,target=/dev,type=bind"
+    ],
+
+    "containerEnv": {
+        "ZEPHYR_TOOLCHAIN_VARIANT": "zephyr",
+        "CCACHE_DIR": "/home/user/.cache/ccache",
+        "HOST_WORKSPACE_FOLDER": "${localWorkspaceFolder}",
+        "CONTAINER_WORKSPACE_FOLDER": "${containerWorkspaceFolder}"
+    },
+
+    // Configure tool-specific properties.
+    // https://code.visualstudio.com/docs/remote/devcontainerjson-reference#_vs-code-specific-properties
+    "customizations": {
+        "vscode": {
+            "settings": {
+                "editor.formatOnSave": true,
+                "editor.rulers": [
+                    150
+                ],
+                "[c]": {
+                    "editor.defaultFormatter": "ms-vscode.cpptools"
+                },
+                "[cpp]": {
+                    "editor.defaultFormatter": "ms-vscode.cpptools"
+                },
+                "C_Cpp.formatting": "clangFormat",
+                // Nearest .clang-format wins: the repo's for our code, each dependency's own under deps/.
+                // Same clang-format binary as scripts/check_format.sh and CI.
+                "C_Cpp.clang_format_style": "file",
+                "C_Cpp.clang_format_path": "/usr/bin/clang-format-20",
+                "terminal.integrated.scrollback": 100000,
+                "explorer.compactFolders": false,
+                "files.trimTrailingWhitespace": false,
+                "terminal.integrated.defaultProfile.linux": "bash",
+                "extensions.ignoreRecommendations": true,
+                "git.autoRepositoryDetection": "subFolders",
+                "files.watcherExclude": {
+                    "**/deps/**": true,
+                    "**/.west/**": true
+                },
+                "files.exclude": {
+                    "**/.git": true,
+                    "**/.svn": true,
+                    "**/.hg": true,
+                    "**/CVS": true,
+                    "**/.DS_Store": true,
+                    "**/Thumbs.db": true,
+                    "**/.west": true
+                }
+            },
+            "extensions": [
+                "mcu-debug.debug-tracker-vscode",
+                "ms-vscode.cpptools",
+                "mcu-debug.mcu-debug",
+                "wayou.vscode-todo-highlight",
+                "cnshenj.vscode-task-manager",
+                "awsxxf.serialterminal",
+                "Anthropic.claude-code",
+                "openai.chatgpt",
+                "nordic-semiconductor.nrf-connect",
+                "nordic-semiconductor.nrf-connect-extension-pack"
+            ]
+        }
+    }
+}

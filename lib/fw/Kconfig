@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: Apache-2.0
+
+config FW_CPP
+	bool "C++ firmware helpers (fw::)"
+	depends on CPP
+	default y
+	help
+	  Header-only C++23 helpers under <fw/...>: the fw::Result error
+	  model and Zephyr error-code conversions, and fw::ChannelRef (typed
+	  zbus channels, needs CONFIG_ZBUS).
