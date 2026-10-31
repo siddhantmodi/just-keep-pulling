@@ -1,0 +1,49 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+
+/*
+ * The XIAO's nPM1300 PMIC, which the board's own devicetree leaves out. It is on
+ * its own I2C pins (Seeed pinout: SDA P1.18, SCL P1.17). Serial instances 20-23
+ * are taken by the board (console, XIAO UART, XIAO I2C, XIAO SPI), so it uses 24.
+ */
+
+&pinctrl {
+	i2c24_default: i2c24_default {
+		group1 {
+			psels = <NRF_PSEL(TWIM_SDA, 1, 18)>,
+				<NRF_PSEL(TWIM_SCL, 1, 17)>;
+		};
+	};
+
+	i2c24_sleep: i2c24_sleep {
+		group1 {
+			psels = <NRF_PSEL(TWIM_SDA, 1, 18)>,
+				<NRF_PSEL(TWIM_SCL, 1, 17)>;
+			low-power-enable;
+		};
+	};
+};
+
+&i2c24 {
+	status = "okay";
+	pinctrl-0 = <&i2c24_default>;
+	pinctrl-1 = <&i2c24_sleep>;
+	pinctrl-names = "default", "sleep";
+
+	npm1300_pmic: pmic@6b {
+		compatible = "nordic,npm1300";
+		reg = <0x6b>;
+
+		npm1300_charger: charger {
+			compatible = "nordic,npm1300-charger";
+			/* 2000 mAh LiPo: 500 mA (0.25C) to 4.2 V, within a 500 mA USB budget. */
+			term-microvolt = <4200000>;
+			current-microamp = <500000>;
+			vbus-limit-microamp = <500000>;
+			dischg-limit-microamp = <1000000>;
+			/* The XIAO's battery pads have no thermistor; the PMIC still stops on die temperature. */
+			thermistor-ohms = <0>;
+			thermistor-beta = <3380>;
+			charging-enable;
+		};
+	};
+};
