@@ -268,6 +268,28 @@ async def test_shutdown_disconnects_and_advertising_resumes(client, ble_dut, dev
         await disconnected
     await wait_for_log(ble_dut, r"shutdown requested")
 
-    # As Crimpdeq: the device stays on and can be found again.
+    # As Crimpdeq: the device stays on and can be found again. Wait for it to
+    # report the connection: dropping the link while it is still being set up
+    # is a different case (a connection the device never announces).
     connection = await connect_by_name(virtual_link.central, device.name)
+    await wait_for_log(ble_dut, r"ble_svc: connected")
+    await connection.disconnect()
+
+
+@pytest.mark.asyncio
+async def test_a_link_dropped_at_once_leaves_the_device_usable(device, ble_dut, virtual_link):
+    # Dropped before the device may have set it up (it then never announces it).
+    connection = await connect_by_name(virtual_link.central, device.name)
+    await connection.disconnect()
+
+    connection = await connect_by_name(virtual_link.central, device.name)
+    peer = Peer(connection)
+    await peer.discover_services()
+    for service in peer.services:
+        await peer.discover_characteristics(service=service)
+    notifications: asyncio.Queue[bytes] = asyncio.Queue()
+    await characteristic(peer, DATA_POINT_UUID).subscribe(notifications.put_nowait)
+    await characteristic(peer, CONTROL_POINT_UUID).write_value(GET_APP_VERSION, with_response=True)
+    async with asyncio.timeout(5):
+        assert (await notifications.get())[2:] == b"2.0.4"
     await connection.disconnect()

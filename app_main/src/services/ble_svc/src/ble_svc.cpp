@@ -132,7 +132,8 @@ public:
     [[nodiscard]] fw::Result<> disconnect() override;
 
     void on_connected( bt_conn *conn );
-    void on_disconnected();
+    /** @brief Forget the connection. Returns whether there was one (on_connected() ran for it). */
+    bool on_disconnected();
     void on_notification_sent( std::uintptr_t generation );
     [[nodiscard]] bool connected() const;
     [[nodiscard]] bool streaming() const;
@@ -240,7 +241,7 @@ void Client::on_connected( bt_conn *conn )
     streaming_ = false;
 }
 
-void Client::on_disconnected()
+bool Client::on_disconnected()
 {
     bt_conn *conn = nullptr;
     {
@@ -250,9 +251,11 @@ void Client::on_disconnected()
         queued_ = 0;
         streaming_ = false;
     }
-    if( conn != nullptr ) {
-        bt_conn_unref( conn );
+    if( conn == nullptr ) {
+        return false;
     }
+    bt_conn_unref( conn );
+    return true;
 }
 
 void Client::on_notification_sent( std::uintptr_t generation )
@@ -339,7 +342,9 @@ void slow_down_advertising( k_work * /*work*/ )
 void on_connected( bt_conn *conn, std::uint8_t err )
 {
     if( err != 0 ) {
-        LOG_WRN( "connection failed: 0x%02x", err );
+        // Includes a central dropping the link while the stack sets it up: Zephyr
+        // handles the disconnection first and reports the connection with its reason.
+        LOG_INF( "connection dropped during setup: 0x%02x", err );
         return;
     }
     instance.on_connected( conn );
@@ -352,7 +357,10 @@ void on_connected( bt_conn *conn, std::uint8_t err )
 
 void on_disconnected( bt_conn * /*conn*/, std::uint8_t reason )
 {
-    instance.on_disconnected();
+    // Also called for a connection dropped during setup, which was never announced.
+    if( !instance.on_disconnected() ) {
+        return;
+    }
     LOG_INF( "disconnected: 0x%02x", reason );
     if( auto ret = channels::client_connection.publish( { .connected = false } ); !ret ) {
         LOG_ERR( "connection publish failed: %d", fw::err::to_zephyr( ret.error() ) );
