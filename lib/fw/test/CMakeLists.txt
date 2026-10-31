@@ -12,4 +12,5 @@ target_sources(app PRIVATE
     src/test_channel_ref.cpp
     src/test_scoped_lock.cpp
     src/test_queue_ref.cpp
+    src/test_settings.cpp
 )

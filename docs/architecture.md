@@ -19,7 +19,7 @@ If yes, use it directly. A seam (an injected, mockable dependency) is only neede
 | Mutex, semaphore, message queue, threads | Yes | Thin RAII where it removes boilerplate (e.g. a lock guard) | None |
 | zbus | Yes | Typed `ChannelRef<T>` | None: tests publish to and read real channels |
 | Work queues, timers | Yes, on simulated time | Member-function callbacks, `std::chrono` | Only when logic decides *when* something happens (rule 4) |
-| Settings / NVS / ZMS | Yes, on the flash simulator | Typed load/save helper (when first needed) | A domain interface for consumers (e.g. a calibration store), not a generic key-value mock |
+| Settings (ZMS) | Yes, on the flash simulator | `fw::settings::load<T>` / `save` / `erase` | A domain interface for consumers (e.g. a calibration store), not a generic key-value mock |
 | Peripherals (GPIO, ADC, sensors, PWM, I2C) | Partly (emulators), but awkward and per-board | `lib/hal` capability implementations | Capability interfaces in `lib/hal` |
 | Large stacks (BLE, networking) | No | None | Split: thin adapter (integration-tested) + pure logic (unit-tested) |
 
@@ -42,7 +42,7 @@ Integration tests run the **real app binary** on `native_sim`, not a cut-down fi
 ## Layers
 
 ```
-lib/fw/            C++ over Zephyr, no hardware: fw::Result, fw::ChannelRef (typed zbus), fw::QueueRef (k_msgq), fw::ScopedLock
+lib/fw/            C++ over Zephyr, no hardware: fw::Result, fw::ChannelRef (typed zbus), fw::QueueRef (k_msgq), fw::ScopedLock, fw::settings (typed load/save)
 lib/hal/           Hardware capabilities
   include/hal/                Interfaces only, no Zephyr includes (what logic depends on)
   include/hal/zephyr/         Thin Zephyr implementations, tested against native_sim emulators

@@ -15,7 +15,7 @@ west.yml              West manifest: sdk-nrf (allowlisted) and googletest, fetch
 west_setup.sh         Initialize/update the west workspace (run by the devcontainer and CI)
 zephyr/module.yml     This repo is a Zephyr module, so lib/, drivers/ and dts/ are available to every app and test
 lib/
-  fw/                 Header-only C++ helpers: fw::Result, fw::ChannelRef (zbus), fw::QueueRef (k_msgq), fw::ScopedLock
+  fw/                 Header-only C++ helpers: fw::Result, fw::ChannelRef (zbus), fw::QueueRef (k_msgq), fw::ScopedLock, fw::settings
   hal/                Hardware capability interfaces (<hal/...>), Zephyr implementations (<hal/zephyr/...>), GoogleMocks (<hal/mocks/...>)
   gtest/              GoogleTest/GoogleMock as a Zephyr library (CONFIG_GTEST), test-only
 drivers/              Repo-owned Zephyr drivers: ADS1220 load-cell ADC (+ chip emulator), emulated temperature sensor
