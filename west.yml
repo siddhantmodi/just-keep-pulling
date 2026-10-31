@@ -16,7 +16,7 @@ manifest:
     - name: nrf
       remote: ncs
       repo-path: sdk-nrf
-      revision: main
+      revision: v3.5.0-preview4
       import:
         path-prefix: deps
         # Only fetch what a Bluetooth LE app on nRF52/nRF53/nRF54 needs. Applies to Zephyr's imports too.
