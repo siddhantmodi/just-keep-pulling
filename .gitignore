@@ -76,3 +76,6 @@ artifacts/
 .venv/
 __pycache__/
 *.egg-info/
+
+# native_sim simulated flash, written to the working directory when an app runs
+flash.bin
