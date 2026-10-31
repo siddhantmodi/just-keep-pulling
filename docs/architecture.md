@@ -48,7 +48,7 @@ lib/hal/           Hardware capabilities
   include/hal/zephyr/         Thin Zephyr implementations, tested against native_sim emulators
   mocks/include/hal/mocks/    GoogleMocks of the interfaces (on the include path only with CONFIG_GTEST)
 lib/gtest/         GoogleTest/GoogleMock as a Zephyr library
-drivers/           Zephyr drivers owned by this repo, e.g. the emulated temperature sensor for native_sim
+drivers/           Zephyr drivers owned by this repo: the ADS1220 load-cell ADC and its chip emulator, the emulated temperature sensor
 include/jkp/       Their public headers (<jkp/drivers/...>)
 dts/bindings/      Their devicetree bindings
 app_<name>/src/    Components of one application
@@ -117,7 +117,7 @@ led_svc/
 
 Tests construct a fresh instance per test with mocks: no singleton reset, no link-time seam. A component test builds only the logic `.cpp` files and sources the component's `Kconfig` (for its log level). A HAL implementation is tested once in `lib/hal/test` against an emulator; components never test it again.
 
-**App code is identical on every board.** Board differences live in devicetree: production files bind an alias (`led0`, `die-temp`), and each board's overlay points it at real hardware or an emulator. Where Zephyr has no emulator for a peripheral (e.g. the die temperature sensor), the repo adds a small emulated driver under `drivers/` with a test-control header, instead of `#if` branches in the app.
+**App code is identical on every board.** Board differences live in devicetree: production files bind an alias (`led0`, `die-temp`), and each board's overlay points it at real hardware or an emulator. Where Zephyr has no emulator for a peripheral (e.g. the die temperature sensor), the repo adds a small emulated driver under `drivers/` with a test-control header, instead of `#if` branches in the app. Where the repo has its own driver, the emulator works at the chip's bus level instead (the ADS1220 emulator answers SPI commands on native_sim's SPI emulator bus and pulses an emulated /DRDY pin), so the real driver runs in tests too.
 
 **Who depends on whom** (wired in production files):
 

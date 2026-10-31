@@ -2,6 +2,8 @@
 
 menu "just-keep-pulling drivers"
 
+rsource "ads1220/Kconfig"
+
 if SENSOR
 rsource "sensor/Kconfig"
 endif

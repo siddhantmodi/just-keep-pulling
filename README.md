@@ -18,7 +18,7 @@ lib/
   fw/                 Header-only C++ helpers: fw::Result, fw::ChannelRef (zbus), fw::QueueRef (k_msgq), fw::ScopedLock
   hal/                Hardware capability interfaces (<hal/...>), Zephyr implementations (<hal/zephyr/...>), GoogleMocks (<hal/mocks/...>)
   gtest/              GoogleTest/GoogleMock as a Zephyr library (CONFIG_GTEST), test-only
-drivers/              Repo-owned Zephyr drivers (emulated temperature sensor for native_sim)
+drivers/              Repo-owned Zephyr drivers: ADS1220 load-cell ADC (+ chip emulator), emulated temperature sensor
 include/jkp/          Their headers; dts/bindings/ holds their devicetree bindings
 docs/architecture.md  Design rules, layers, why C++, and when to revisit them
 app_main/             The dynamometer firmware (XIAO nRF54LM20A; native_sim for tests)

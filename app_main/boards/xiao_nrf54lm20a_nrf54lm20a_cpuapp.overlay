@@ -47,3 +47,27 @@
 		};
 	};
 };
+
+/*
+ * ADS1220 load-cell ADC on the XIAO SPI (SCK P1.04, MOSI P1.06, MISO P1.05),
+ * /CS on P1.00 (D0) and /DRDY on P1.31 (D1). Ratiometric: REFP0/REFN0 across
+ * the bridge excitation; bridge signal on AIN1/AIN2; bridge returned through
+ * AIN3/REFN1 so the low-side switch cuts it while powered down.
+ */
+/ {
+	aliases {
+		load-cell-adc = &load_cell_adc;
+	};
+};
+
+&spi23 {
+	cs-gpios = <&gpio1 0 GPIO_ACTIVE_LOW>;
+
+	load_cell_adc: ads1220@0 {
+		compatible = "jkp,ads1220";
+		reg = <0>;
+		spi-max-frequency = <2000000>;
+		drdy-gpios = <&gpio1 31 GPIO_ACTIVE_LOW>;
+		low-side-power-switch;
+	};
+};
