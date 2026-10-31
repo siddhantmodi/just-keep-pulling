@@ -20,6 +20,7 @@
 #include <system_error>
 
 using ::hal::LoadCellSample;
+using ::hal::SampleRate;
 using ::hal::mocks::MockLoadCellAdc;
 using ::testing::_;
 using ::testing::InSequence;
@@ -40,10 +41,6 @@ protected:
         ASSERT_TRUE( fw::settings::init() );
         (void)fw::settings::erase( load_cell_svc::factor_key );
         (void)fw::settings::erase( load_cell_svc::rate_key );
-        // The mocked ADC offers the ADS1220's normal-mode rates.
-        ON_CALL( adc_, supports_rate( _ ) )
-            .WillByDefault( []( std::uint16_t rate )
-                            { return rate == 20 || rate == 45 || rate == 90 || rate == 175 || rate == 330 || rate == 600 || rate == 1000; } );
         // The mocked ADC reads raw_ with an increasing timestamp.
         ON_CALL( adc_, read( _ ) )
             .WillByDefault(
@@ -106,7 +103,7 @@ TEST_F( LoadCellTest, InitFailsWhenAdcNotReady )
 TEST_F( LoadCellTest, ReadAppliesTareAndFactorAndKeepsTimestamp )
 {
     ASSERT_TRUE( load_cell_.init() );
-    ASSERT_TRUE( load_cell_.start( 175 ) );
+    ASSERT_TRUE( load_cell_.start( SampleRate::sps175 ) );
     set_load( 0.0 );
     ASSERT_TRUE( load_cell_.tare() );
     set_load( 20.0 );
@@ -122,7 +119,7 @@ TEST_F( LoadCellTest, TareWhileStoppedSamplesBrieflyAtTheDefaultRate )
 {
     ASSERT_TRUE( load_cell_.init() );
     InSequence sequence;
-    EXPECT_CALL( adc_, start( load_cell_svc::default_samples_per_second ) );
+    EXPECT_CALL( adc_, start( load_cell_svc::default_rate ) );
     EXPECT_CALL( adc_, read( _ ) ).Times( 35 ); // 175 SPS x 200 ms
     EXPECT_CALL( adc_, stop() );
 
@@ -132,7 +129,7 @@ TEST_F( LoadCellTest, TareWhileStoppedSamplesBrieflyAtTheDefaultRate )
 TEST_F( LoadCellTest, TareWhileSamplingKeepsTheRunningRate )
 {
     ASSERT_TRUE( load_cell_.init() );
-    ASSERT_TRUE( load_cell_.start( 1000 ) );
+    ASSERT_TRUE( load_cell_.start( SampleRate::sps1000 ) );
     EXPECT_CALL( adc_, start( _ ) ).Times( 0 );
     EXPECT_CALL( adc_, stop() ).Times( 0 );
     EXPECT_CALL( adc_, read( _ ) ).Times( 200 ); // 1000 SPS x 200 ms
@@ -143,11 +140,11 @@ TEST_F( LoadCellTest, TareWhileSamplingKeepsTheRunningRate )
 TEST_F( LoadCellTest, CalibrationSamplesAt90SpsThenRestoresTheRunningRate )
 {
     ASSERT_TRUE( load_cell_.init() );
-    ASSERT_TRUE( load_cell_.start( 175 ) );
+    ASSERT_TRUE( load_cell_.start( SampleRate::sps175 ) );
     InSequence sequence;
-    EXPECT_CALL( adc_, start( 90 ) );
+    EXPECT_CALL( adc_, start( SampleRate::sps90 ) );
     EXPECT_CALL( adc_, read( _ ) ).Times( 112 ); // 90 SPS x 1.25 s
-    EXPECT_CALL( adc_, start( 175 ) );
+    EXPECT_CALL( adc_, start( SampleRate::sps175 ) );
 
     EXPECT_EQ( load_cell_.add_calibration_point( 0.0F ), 1U );
 }
@@ -237,27 +234,28 @@ TEST_F( LoadCellTest, SampleRateDefaultsTo175 )
 {
     ASSERT_TRUE( load_cell_.init() );
 
-    EXPECT_EQ( load_cell_.sample_rate(), 175 );
+    EXPECT_EQ( load_cell_.sample_rate(), SampleRate::sps175 );
 }
 
 TEST_F( LoadCellTest, SetSampleRateSavesItForLaterBoots )
 {
     ASSERT_TRUE( load_cell_.init() );
 
-    ASSERT_TRUE( load_cell_.set_sample_rate( 1000 ) );
+    ASSERT_TRUE( load_cell_.set_sample_rate( SampleRate::sps1000 ) );
 
-    EXPECT_EQ( load_cell_.sample_rate(), 1000 );
+    EXPECT_EQ( load_cell_.sample_rate(), SampleRate::sps1000 );
     load_cell_svc::LoadCell next_boot{ adc_ };
     ASSERT_TRUE( next_boot.init() );
-    EXPECT_EQ( next_boot.sample_rate(), 1000 );
+    EXPECT_EQ( next_boot.sample_rate(), SampleRate::sps1000 );
 }
 
-TEST_F( LoadCellTest, SetSampleRateRejectsRatesTheAdcDoesNotOffer )
+TEST_F( LoadCellTest, SavesRateAsSamplesPerSecond )
 {
     ASSERT_TRUE( load_cell_.init() );
 
-    EXPECT_EQ( load_cell_.set_sample_rate( 100 ).error(), std::errc::not_supported );
-    EXPECT_EQ( load_cell_.sample_rate(), 175 );
+    ASSERT_TRUE( load_cell_.set_sample_rate( SampleRate::sps330 ) );
+
+    EXPECT_EQ( fw::settings::load<std::uint16_t>( load_cell_svc::rate_key ), 330 );
 }
 
 TEST_F( LoadCellTest, InitIgnoresUnsupportedSavedRate )
@@ -266,7 +264,7 @@ TEST_F( LoadCellTest, InitIgnoresUnsupportedSavedRate )
 
     ASSERT_TRUE( load_cell_.init() );
 
-    EXPECT_EQ( load_cell_.sample_rate(), 175 );
+    EXPECT_EQ( load_cell_.sample_rate(), SampleRate::sps175 );
 }
 
 } // namespace

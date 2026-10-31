@@ -17,6 +17,7 @@
 #include <cstdint>
 #include <fw/error.hpp>
 #include <hal/load_cell_adc.hpp>
+#include <optional>
 
 namespace load_cell_svc
 {
@@ -27,11 +28,11 @@ inline constexpr const char *factor_key = "load_cell/factor";
 inline constexpr const char *rate_key = "load_cell/rate";
 
 /** @brief The configured rate until changed, and the rate used to tare while not sampling (Crimpdeq's default). */
-inline constexpr std::uint16_t default_samples_per_second = 175;
+inline constexpr hal::SampleRate default_rate = hal::SampleRate::sps175;
 inline constexpr std::chrono::milliseconds tare_duration{ 200 };
 
 /** @brief Calibration points are averaged at a low rate, which has less noise per conversion. */
-inline constexpr std::uint16_t calibration_samples_per_second = 90;
+inline constexpr hal::SampleRate calibration_rate = hal::SampleRate::sps90;
 inline constexpr std::chrono::milliseconds calibration_duration{ 1250 };
 inline constexpr std::size_t max_calibration_points = 20;
 
@@ -44,9 +45,9 @@ public:
     }
 
     [[nodiscard]] fw::Result<> init() override;
-    [[nodiscard]] std::uint16_t sample_rate() const override;
-    [[nodiscard]] fw::Result<> set_sample_rate( std::uint16_t samples_per_second ) override;
-    [[nodiscard]] fw::Result<> start( std::uint16_t samples_per_second ) override;
+    [[nodiscard]] hal::SampleRate sample_rate() const override;
+    [[nodiscard]] fw::Result<> set_sample_rate( hal::SampleRate rate ) override;
+    [[nodiscard]] fw::Result<> start( hal::SampleRate rate ) override;
     [[nodiscard]] fw::Result<ForceSample> read( std::chrono::microseconds timeout ) override;
     [[nodiscard]] fw::Result<> stop() override;
     [[nodiscard]] std::uint32_t lost_samples() const override;
@@ -56,14 +57,14 @@ public:
     [[nodiscard]] float calibration_factor() const override;
 
 private:
-    /** @brief Average raw code over @p duration at @p samples_per_second, then restore the previous sampling. */
-    fw::Result<double> average_raw( std::uint16_t samples_per_second, std::chrono::milliseconds duration );
+    /** @brief Average raw code over @p duration at @p rate, then restore the previous sampling. */
+    fw::Result<double> average_raw( hal::SampleRate rate, std::chrono::milliseconds duration );
 
     hal::ILoadCellAdc &adc_;
     std::int32_t tare_{ 0 };
     float factor_{ calibration::default_factor };
-    std::uint16_t running_rate_{ 0 }; // 0: stopped
-    std::atomic<std::uint16_t> configured_rate_{ default_samples_per_second };
+    std::optional<hal::SampleRate> running_rate_; // empty: stopped
+    std::atomic<hal::SampleRate> configured_rate_{ default_rate };
     std::array<calibration::Point, max_calibration_points> points_{};
     std::size_t point_count_{ 0 };
 };

@@ -24,9 +24,9 @@ namespace
 {
 
 /** @brief Long enough for the next conversion: two periods plus a margin for scheduling. */
-std::chrono::microseconds read_timeout( std::uint16_t samples_per_second )
+std::chrono::microseconds read_timeout( hal::SampleRate rate )
 {
-    return std::chrono::microseconds{ ( 2'000'000 / samples_per_second ) + 20'000 };
+    return std::chrono::microseconds{ ( 2'000'000 / hal::samples_per_second( rate ) ) + 20'000 };
 }
 
 } // namespace
@@ -51,42 +51,41 @@ fw::Result<> LoadCell::init()
         factor_ = *stored;
     }
 
-    auto rate = fw::settings::load<std::uint16_t>( rate_key );
-    if( rate && adc_.supports_rate( *rate ) ) {
+    // Saved as samples per second, so the stored value does not depend on the enum.
+    auto saved_rate = fw::settings::load<std::uint16_t>( rate_key );
+    auto rate = saved_rate ? hal::to_sample_rate( *saved_rate ) : std::unexpected( saved_rate.error() );
+    if( rate ) {
         configured_rate_ = *rate;
     } else {
-        if( rate || rate.error() != std::errc::no_such_file_or_directory ) {
-            LOG_WRN( "saved sample rate unusable, using %u SPS", default_samples_per_second );
+        if( rate.error() != std::errc::no_such_file_or_directory ) {
+            LOG_WRN( "saved sample rate unusable, using %u SPS", hal::samples_per_second( default_rate ) );
         }
-        configured_rate_ = default_samples_per_second;
+        configured_rate_ = default_rate;
     }
     return {};
 }
 
-std::uint16_t LoadCell::sample_rate() const
+hal::SampleRate LoadCell::sample_rate() const
 {
     return configured_rate_;
 }
 
-fw::Result<> LoadCell::set_sample_rate( std::uint16_t samples_per_second )
+fw::Result<> LoadCell::set_sample_rate( hal::SampleRate rate )
 {
-    if( !adc_.supports_rate( samples_per_second ) ) {
-        return std::unexpected( std::errc::not_supported );
-    }
-    if( auto ret = fw::settings::save( rate_key, samples_per_second ); !ret ) {
+    if( auto ret = fw::settings::save( rate_key, hal::samples_per_second( rate ) ); !ret ) {
         return ret;
     }
-    configured_rate_ = samples_per_second;
-    LOG_INF( "sample rate set to %u SPS", samples_per_second );
+    configured_rate_ = rate;
+    LOG_INF( "sample rate set to %u SPS", hal::samples_per_second( rate ) );
     return {};
 }
 
-fw::Result<> LoadCell::start( std::uint16_t samples_per_second )
+fw::Result<> LoadCell::start( hal::SampleRate rate )
 {
-    if( auto ret = adc_.start( samples_per_second ); !ret ) {
+    if( auto ret = adc_.start( rate ); !ret ) {
         return ret;
     }
-    running_rate_ = samples_per_second;
+    running_rate_ = rate;
     return {};
 }
 
@@ -101,7 +100,7 @@ fw::Result<ForceSample> LoadCell::read( std::chrono::microseconds timeout )
 
 fw::Result<> LoadCell::stop()
 {
-    running_rate_ = 0;
+    running_rate_.reset();
     return adc_.stop();
 }
 
@@ -110,17 +109,17 @@ std::uint32_t LoadCell::lost_samples() const
     return adc_.lost_samples();
 }
 
-fw::Result<double> LoadCell::average_raw( std::uint16_t samples_per_second, std::chrono::milliseconds duration )
+fw::Result<double> LoadCell::average_raw( hal::SampleRate rate, std::chrono::milliseconds duration )
 {
-    std::uint16_t const previous_rate = running_rate_;
-    if( previous_rate != samples_per_second ) {
-        if( auto ret = adc_.start( samples_per_second ); !ret ) {
+    std::optional<hal::SampleRate> const previous_rate = running_rate_;
+    if( previous_rate != rate ) {
+        if( auto ret = adc_.start( rate ); !ret ) {
             return std::unexpected( ret.error() );
         }
     }
 
-    auto const count = std::max<std::int64_t>( 1, ( std::int64_t{ samples_per_second } * duration.count() ) / 1000 );
-    auto const timeout = read_timeout( samples_per_second );
+    auto const count = std::max<std::int64_t>( 1, ( std::int64_t{ hal::samples_per_second( rate ) } * duration.count() ) / 1000 );
+    auto const timeout = read_timeout( rate );
     std::int64_t sum = 0;
     fw::Result<> result{};
     for( std::int64_t i = 0; i < count && result; ++i ) {
@@ -134,16 +133,16 @@ fw::Result<double> LoadCell::average_raw( std::uint16_t samples_per_second, std:
 
     // Restore the previous sampling: stopped, or running at its own rate.
     fw::Result<> restored{};
-    if( previous_rate == 0 ) {
+    if( !previous_rate ) {
         restored = adc_.stop();
-    } else if( previous_rate != samples_per_second ) {
-        restored = adc_.start( previous_rate );
+    } else if( *previous_rate != rate ) {
+        restored = adc_.start( *previous_rate );
     }
     if( !result ) {
         return std::unexpected( result.error() );
     }
     if( !restored ) {
-        running_rate_ = 0;
+        running_rate_.reset();
         return std::unexpected( restored.error() );
     }
     return static_cast<double>( sum ) / static_cast<double>( count );
@@ -151,8 +150,7 @@ fw::Result<double> LoadCell::average_raw( std::uint16_t samples_per_second, std:
 
 fw::Result<> LoadCell::tare()
 {
-    std::uint16_t const rate = running_rate_ != 0 ? running_rate_ : default_samples_per_second;
-    auto average = average_raw( rate, tare_duration );
+    auto average = average_raw( running_rate_.value_or( default_rate ), tare_duration );
     if( !average ) {
         LOG_ERR( "tare failed: %d", fw::err::to_zephyr( average.error() ) );
         return std::unexpected( average.error() );
@@ -171,7 +169,7 @@ fw::Result<std::size_t> LoadCell::add_calibration_point( float kg )
         return std::unexpected( std::errc::no_buffer_space );
     }
 
-    auto average = average_raw( calibration_samples_per_second, calibration_duration );
+    auto average = average_raw( calibration_rate, calibration_duration );
     if( !average ) {
         LOG_ERR( "calibration point failed: %d", fw::err::to_zephyr( average.error() ) );
         return std::unexpected( average.error() );

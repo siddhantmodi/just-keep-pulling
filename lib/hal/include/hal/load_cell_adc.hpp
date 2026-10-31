@@ -11,12 +11,49 @@
 
 #pragma once
 
+#include <array>
 #include <chrono>
 #include <cstdint>
+#include <expected>
 #include <fw/error.hpp>
+#include <system_error>
+#include <utility>
 
 namespace hal
 {
+
+/**
+ * @brief The sampling rates the load-cell ADC offers (the ADS1220's normal-mode
+ *        rates). The value is the rate in samples per second.
+ */
+enum class SampleRate : std::uint16_t {
+    sps20 = 20,
+    sps45 = 45,
+    sps90 = 90,
+    sps175 = 175,
+    sps330 = 330,
+    sps600 = 600,
+    sps1000 = 1000,
+};
+
+inline constexpr std::array all_sample_rates{ SampleRate::sps20,  SampleRate::sps45,  SampleRate::sps90,  SampleRate::sps175,
+                                              SampleRate::sps330, SampleRate::sps600, SampleRate::sps1000 };
+
+[[nodiscard]] constexpr std::uint16_t samples_per_second( SampleRate rate ) noexcept
+{
+    return std::to_underlying( rate );
+}
+
+/** @brief The rate for a number of samples per second, e.g. from settings or a user. Fails with not_supported. */
+[[nodiscard]] constexpr fw::Result<SampleRate> to_sample_rate( std::uint16_t samples_per_second ) noexcept
+{
+    for( SampleRate const rate : all_sample_rates ) {
+        if( std::to_underlying( rate ) == samples_per_second ) {
+            return rate;
+        }
+    }
+    return std::unexpected( std::errc::not_supported );
+}
 
 struct LoadCellSample {
     std::int32_t raw;
@@ -30,11 +67,8 @@ public:
     /** @brief Check the ADC is usable. It stays powered down until start(). Fails with no_such_device. */
     [[nodiscard]] virtual fw::Result<> init() = 0;
 
-    /** @brief Whether start() accepts @p samples_per_second. */
-    [[nodiscard]] virtual bool supports_rate( std::uint16_t samples_per_second ) const = 0;
-
-    /** @brief Convert continuously. Fails with not_supported for a rate the ADC does not offer. */
-    [[nodiscard]] virtual fw::Result<> start( std::uint16_t samples_per_second ) = 0;
+    /** @brief Convert continuously at @p rate. */
+    [[nodiscard]] virtual fw::Result<> start( SampleRate rate ) = 0;
 
     /**
      * @brief Wait up to @p timeout for the next sample. Fails with

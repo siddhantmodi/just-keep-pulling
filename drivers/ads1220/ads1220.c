@@ -115,11 +115,6 @@ static int data_rate_bits( uint16_t samples_per_second )
     return -ENOTSUP;
 }
 
-bool ads1220_supports_rate( uint16_t samples_per_second )
-{
-    return data_rate_bits( samples_per_second ) >= 0;
-}
-
 int ads1220_start( const struct device *dev, uint16_t samples_per_second )
 {
     const struct ads1220_config *config = dev->config;

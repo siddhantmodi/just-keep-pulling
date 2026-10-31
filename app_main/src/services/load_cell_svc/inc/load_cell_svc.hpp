@@ -18,6 +18,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <fw/error.hpp>
+#include <hal/load_cell_adc.hpp>
 
 namespace load_cell_svc
 {
@@ -35,17 +36,16 @@ public:
     [[nodiscard]] virtual fw::Result<> init() = 0;
 
     /** @brief The configured sampling rate, saved in settings (default 175 SPS). */
-    [[nodiscard]] virtual std::uint16_t sample_rate() const = 0;
+    [[nodiscard]] virtual hal::SampleRate sample_rate() const = 0;
 
     /**
      * @brief Change and save the configured rate; it applies from the next
-     *        start(). Fails with not_supported for a rate the ADC does not offer.
-     *        Safe to call from another thread (e.g. the debug shell).
+     *        start(). Safe to call from another thread (e.g. the debug shell).
      */
-    [[nodiscard]] virtual fw::Result<> set_sample_rate( std::uint16_t samples_per_second ) = 0;
+    [[nodiscard]] virtual fw::Result<> set_sample_rate( hal::SampleRate rate ) = 0;
 
-    /** @brief Sample continuously. Fails with not_supported for a rate the ADC does not offer. */
-    [[nodiscard]] virtual fw::Result<> start( std::uint16_t samples_per_second ) = 0;
+    /** @brief Sample continuously at @p rate. */
+    [[nodiscard]] virtual fw::Result<> start( hal::SampleRate rate ) = 0;
 
     /** @brief Wait up to @p timeout for the next sample, in kg. See hal::ILoadCellAdc::read for the errors. */
     [[nodiscard]] virtual fw::Result<ForceSample> read( std::chrono::microseconds timeout ) = 0;

@@ -21,6 +21,7 @@
 #include <cstdint>
 #include <cstring>
 #include <fw/error.hpp>
+#include <hal/load_cell_adc.hpp>
 #include <system_error>
 
 namespace
@@ -49,25 +50,32 @@ int cmd_id_set( const shell *sh, size_t /*argc*/, char **argv )
 
 int cmd_rate( const shell *sh, size_t /*argc*/, char ** /*argv*/ )
 {
-    shell_print( sh, "%u SPS", load_cell_svc::load_cell().sample_rate() );
+    shell_print( sh, "%u SPS", hal::samples_per_second( load_cell_svc::load_cell().sample_rate() ) );
     return 0;
+}
+
+void print_supported_rates( const shell *sh )
+{
+    shell_fprintf( sh, SHELL_ERROR, "supported rates:" );
+    for( hal::SampleRate const rate : hal::all_sample_rates ) {
+        shell_fprintf( sh, SHELL_ERROR, " %u", hal::samples_per_second( rate ) );
+    }
+    shell_fprintf( sh, SHELL_ERROR, "\n" );
 }
 
 int cmd_rate_set( const shell *sh, size_t /*argc*/, char **argv )
 {
-    std::uint16_t rate = 0;
+    std::uint16_t samples_per_second = 0;
     const char *const end = argv[1] + std::strlen( argv[1] );
-    auto [parsed_end, parse_error] = std::from_chars( argv[1], end, rate );
-    if( parse_error != std::errc{} || parsed_end != end ) {
-        shell_error( sh, "expected a number of samples per second" );
+    auto [parsed_end, parse_error] = std::from_chars( argv[1], end, samples_per_second );
+    auto rate = ( parse_error == std::errc{} && parsed_end == end ) ? hal::to_sample_rate( samples_per_second )
+                                                                    : std::unexpected( std::errc::invalid_argument );
+    if( !rate ) {
+        print_supported_rates( sh );
         return -EINVAL;
     }
-    if( auto ret = load_cell_svc::load_cell().set_sample_rate( rate ); !ret ) {
-        if( ret.error() == std::errc::not_supported ) {
-            shell_error( sh, "unsupported rate; use 20, 45, 90, 175, 330, 600 or 1000" );
-        } else {
-            shell_error( sh, "not set: %d", fw::err::to_zephyr( ret.error() ) );
-        }
+    if( auto ret = load_cell_svc::load_cell().set_sample_rate( *rate ); !ret ) {
+        shell_error( sh, "not set: %d", fw::err::to_zephyr( ret.error() ) );
         return fw::err::to_zephyr( ret.error() );
     }
     shell_print( sh, "sample rate set; it applies from the next measurement" );
