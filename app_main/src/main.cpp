@@ -9,6 +9,7 @@
 #include "identity_svc.hpp"
 #include "load_cell_svc.hpp"
 #include "measurement_manager.hpp"
+#include "motion_svc.hpp"
 #include "pmic_svc.hpp"
 #include "power_manager.hpp"
 
@@ -37,6 +38,11 @@ int main()
         return 0;
     }
     LOG_INF( "calibration: %ld ug per code", std::lround( load_cell_svc::load_cell().calibration_factor() * 1e6F ) );
+
+    // Without the IMU the device still measures; it then only wakes from idle sleep on a power cycle.
+    if( auto ret = motion_svc::motion().init(); !ret ) {
+        LOG_ERR( "motion init failed: %d", fw::err::to_zephyr( ret.error() ) );
+    }
 
     // Without the PMIC the device still measures; only battery reports and low-battery power-off are lost.
     if( auto ret = pmic_svc::pmic().init(); !ret ) {

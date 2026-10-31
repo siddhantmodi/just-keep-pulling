@@ -1,0 +1,810 @@
+From: Siddhant Modi <siddhant.modi@gmail.com>
+Subject: [PATCH] drivers: sensor: lsm6dsl: add motion (wake-up) trigger
+
+Add SENSOR_TRIG_MOTION, raised by the chip's wake-up function: the slope
+of the acceleration exceeding a threshold. SENSOR_ATTR_SLOPE_TH sets the
+threshold (in steps of 1/64 of the accelerometer's full scale) and
+SENSOR_ATTR_SLOPE_DUR the samples it must last. The wake-up interrupt is
+routed to INT1 while a motion handler is set, so INT1 can also wake a SoC
+from a low-power state.
+
+Interrupt sources are now routed to INT1 only while their trigger has a
+handler. Data-ready was routed at init, which kept INT1 toggling at the
+data rate even with no data-ready handler, and would hide motion events.
+With both triggers set, the status registers tell the two apart.
+
+Also fix the misspelt LSM6DSL_SHIFT_WAKE_UP_DUR_WAKE_DUR, and add an I2C
+emulator (wake-up events, register access) with a test of the triggers
+and attributes on native_sim.
+
+diff --git a/drivers/sensor/st/lsm6dsl/CMakeLists.txt b/drivers/sensor/st/lsm6dsl/CMakeLists.txt
+index 1db4e7abe..4605bc342 100644
+--- a/drivers/sensor/st/lsm6dsl/CMakeLists.txt
++++ b/drivers/sensor/st/lsm6dsl/CMakeLists.txt
+@@ -7,3 +7,5 @@ zephyr_library_sources(lsm6dsl_spi.c)
+ zephyr_library_sources(lsm6dsl_i2c.c)
+ zephyr_library_sources_ifdef(CONFIG_LSM6DSL_TRIGGER    lsm6dsl_trigger.c)
+ zephyr_library_sources_ifdef(CONFIG_LSM6DSL_SENSORHUB  lsm6dsl_shub.c)
++zephyr_library_sources_ifdef(CONFIG_EMUL_LSM6DSL       lsm6dsl_emul.c)
++zephyr_include_directories_ifdef(CONFIG_EMUL_LSM6DSL .)
+diff --git a/drivers/sensor/st/lsm6dsl/Kconfig b/drivers/sensor/st/lsm6dsl/Kconfig
+index eb51e5e9a..c55f867c7 100644
+--- a/drivers/sensor/st/lsm6dsl/Kconfig
++++ b/drivers/sensor/st/lsm6dsl/Kconfig
+@@ -17,6 +17,17 @@ menuconfig LSM6DSL
+ 
+ if LSM6DSL
+ 
++config EMUL_LSM6DSL
++	bool "Emulator for LSM6DSL"
++	default y
++	depends on EMUL
++	depends on $(dt_compat_on_bus,$(DT_COMPAT_ST_LSM6DSL),i2c)
++	select GPIO_EMUL if $(dt_compat_any_has_prop,$(DT_COMPAT_ST_LSM6DSL),irq-gpios)
++	help
++	  Enable the hardware emulator for the LSM6DSL on an I2C bus. Doing so
++	  allows exercising the sensor APIs for this IMU, including its
++	  motion (wake-up) trigger, in native_sim.
++
+ choice LSM6DSL_TRIGGER_MODE
+ 	prompt "Trigger mode"
+ 	help
+diff --git a/drivers/sensor/st/lsm6dsl/lsm6dsl.c b/drivers/sensor/st/lsm6dsl/lsm6dsl.c
+index edd8b9391..865a7e0dc 100644
+--- a/drivers/sensor/st/lsm6dsl/lsm6dsl.c
++++ b/drivers/sensor/st/lsm6dsl/lsm6dsl.c
+@@ -230,6 +230,12 @@ static int lsm6dsl_accel_config(const struct device *dev,
+ #ifdef LSM6DSL_ACCEL_ODR_RUNTIME
+ 	case SENSOR_ATTR_SAMPLING_FREQUENCY:
+ 		return lsm6dsl_accel_odr_set(dev, val->val1);
++#endif
++#ifdef CONFIG_LSM6DSL_TRIGGER
++	case SENSOR_ATTR_SLOPE_TH:
++		return lsm6dsl_wake_up_threshold_set(dev, val);
++	case SENSOR_ATTR_SLOPE_DUR:
++		return lsm6dsl_wake_up_duration_set(dev, val);
+ #endif
+ 	default:
+ 		LOG_DBG("Accel attribute not supported.");
+diff --git a/drivers/sensor/st/lsm6dsl/lsm6dsl.h b/drivers/sensor/st/lsm6dsl/lsm6dsl.h
+index 524cc6bd3..8421dbe5c 100644
+--- a/drivers/sensor/st/lsm6dsl/lsm6dsl.h
++++ b/drivers/sensor/st/lsm6dsl/lsm6dsl.h
+@@ -488,7 +488,7 @@
+ #define LSM6DSL_MASK_WAKE_UP_DUR_FF_DUR5		BIT(7)
+ #define LSM6DSL_SHIFT_WAKE_UP_DUR_FF_DUR5		7
+ #define LSM6DSL_MASK_WAKE_UP_DUR_WAKE_DUR		(BIT(6) | BIT(5))
+-#define LSM6DSL_SHIFT_WAKE_UP_DUAR_WAKE_DUR		5
++#define LSM6DSL_SHIFT_WAKE_UP_DUR_WAKE_DUR		5
+ #define LSM6DSL_MASK_WAKE_UP_DUR_TIMER_HR		BIT(4)
+ #define LSM6DSL_SHIFT_WAKE_UP_DUR_TIMER_HR		4
+ #define LSM6DSL_MASK_WAKE_UP_DUR_SLEEP_DUR		(BIT(3) | BIT(2) | \
+@@ -673,6 +673,9 @@ struct lsm6dsl_data {
+ 	const struct sensor_trigger *data_ready_trigger;
+ 	sensor_trigger_handler_t data_ready_handler;
+ 
++	const struct sensor_trigger *motion_trigger;
++	sensor_trigger_handler_t motion_handler;
++
+ #if defined(CONFIG_LSM6DSL_TRIGGER_OWN_THREAD)
+ 	K_KERNEL_STACK_MEMBER(thread_stack, CONFIG_LSM6DSL_THREAD_STACK_SIZE);
+ 	struct k_thread thread;
+@@ -698,6 +701,10 @@ int lsm6dsl_trigger_set(const struct device *dev,
+ 			sensor_trigger_handler_t handler);
+ 
+ int lsm6dsl_init_interrupt(const struct device *dev);
++
++int lsm6dsl_wake_up_threshold_set(const struct device *dev, const struct sensor_value *val);
++
++int lsm6dsl_wake_up_duration_set(const struct device *dev, const struct sensor_value *val);
+ #endif
+ 
+ #endif /* ZEPHYR_DRIVERS_SENSOR_LSM6DSL_LSM6DSL_H_ */
+diff --git a/drivers/sensor/st/lsm6dsl/lsm6dsl_emul.c b/drivers/sensor/st/lsm6dsl/lsm6dsl_emul.c
+new file mode 100644
+index 000000000..f58de58f9
+--- /dev/null
++++ b/drivers/sensor/st/lsm6dsl/lsm6dsl_emul.c
+@@ -0,0 +1,213 @@
++/*
++ * Copyright (c) 2026 Siddhant Modi
++ * SPDX-License-Identifier: Apache-2.0
++ */
++
++#define DT_DRV_COMPAT st_lsm6dsl
++
++#include <string.h>
++
++#include <zephyr/device.h>
++#include <zephyr/drivers/emul.h>
++#include <zephyr/drivers/gpio.h>
++#include <zephyr/drivers/gpio/gpio_emul.h>
++#include <zephyr/drivers/i2c.h>
++#include <zephyr/drivers/i2c_emul.h>
++#include <zephyr/logging/log.h>
++#include <zephyr/spinlock.h>
++
++#include "lsm6dsl.h"
++#include "lsm6dsl_emul.h"
++
++LOG_MODULE_REGISTER(lsm6dsl_emul, CONFIG_SENSOR_LOG_LEVEL);
++
++#define LSM6DSL_EMUL_REG_COUNT 0x80
++
++struct lsm6dsl_emul_cfg {
++	struct gpio_dt_spec int1;
++};
++
++struct lsm6dsl_emul_data {
++	struct k_spinlock lock;
++	uint8_t reg[LSM6DSL_EMUL_REG_COUNT];
++	uint8_t cur_reg;
++	bool int1;
++};
++
++static void lsm6dsl_emul_reset_regs(struct lsm6dsl_emul_data *data)
++{
++	memset(data->reg, 0, sizeof(data->reg));
++	data->reg[LSM6DSL_REG_WHO_AM_I] = LSM6DSL_VAL_WHO_AM_I;
++	data->reg[LSM6DSL_REG_CTRL3_C] = LSM6DSL_MASK_CTRL3_C_IF_INC;
++}
++
++static bool lsm6dsl_emul_int1_active(const struct lsm6dsl_emul_data *data)
++{
++	return (data->reg[LSM6DSL_REG_WAKE_UP_SRC] & LSM6DSL_MASK_WAKE_UP_SRC_WU_IA) != 0U &&
++	       (data->reg[LSM6DSL_REG_MD1_CFG] & LSM6DSL_MASK_MD1_CFG_INT1_WU) != 0U;
++}
++
++/* Drive INT1 only when its level changes: until then the driver may not have configured
++ * the pin as an input.
++ */
++static void lsm6dsl_emul_update_int1(const struct emul *target, bool active)
++{
++	const struct lsm6dsl_emul_cfg *cfg = target->cfg;
++	struct lsm6dsl_emul_data *data = target->data;
++	bool changed = false;
++
++	K_SPINLOCK(&data->lock) {
++		changed = data->int1 != active;
++		data->int1 = active;
++	}
++
++	if (changed && cfg->int1.port != NULL) {
++		gpio_emul_input_set(cfg->int1.port, cfg->int1.pin, active ? 1 : 0);
++	}
++}
++
++static void lsm6dsl_emul_write_reg(struct lsm6dsl_emul_data *data, uint8_t reg, uint8_t val)
++{
++	switch (reg) {
++	case LSM6DSL_REG_WHO_AM_I:
++	case LSM6DSL_REG_WAKE_UP_SRC:
++	case LSM6DSL_REG_STATUS_REG:
++		/* Read-only */
++		break;
++	case LSM6DSL_REG_CTRL3_C:
++		if ((val & LSM6DSL_MASK_CTRL3_C_SW_RESET) != 0U) {
++			lsm6dsl_emul_reset_regs(data);
++		} else {
++			/* BOOT completes at once and clears itself */
++			data->reg[reg] = val & ~LSM6DSL_MASK_CTRL3_C_BOOT;
++		}
++		break;
++	default:
++		data->reg[reg] = val;
++		break;
++	}
++}
++
++static uint8_t lsm6dsl_emul_read_reg(struct lsm6dsl_emul_data *data, uint8_t reg)
++{
++	uint8_t val = data->reg[reg];
++
++	if (reg == LSM6DSL_REG_WAKE_UP_SRC) {
++		/* Reading the source clears the wake-up event */
++		data->reg[reg] = 0;
++	}
++
++	return val;
++}
++
++static int lsm6dsl_emul_transfer_i2c(const struct emul *target, struct i2c_msg *msgs, int num_msgs,
++				     int addr)
++{
++	struct lsm6dsl_emul_data *data = target->data;
++	bool int1 = false;
++
++	ARG_UNUSED(addr);
++
++	K_SPINLOCK(&data->lock) {
++		for (int m = 0; m < num_msgs; m++) {
++			struct i2c_msg *msg = &msgs[m];
++			uint32_t i = 0;
++
++			if ((msg->flags & I2C_MSG_READ) != 0U) {
++				for (; i < msg->len; i++) {
++					msg->buf[i] = lsm6dsl_emul_read_reg(
++						data, data->cur_reg++ % LSM6DSL_EMUL_REG_COUNT);
++				}
++				continue;
++			}
++
++			/* A write starts with the register address, unless it continues the
++			 * previous write message (e.g. a burst write's data)
++			 */
++			if (m == 0 || (msg->flags & I2C_MSG_RESTART) != 0U ||
++			    (msgs[m - 1].flags & I2C_MSG_READ) != 0U) {
++				if (msg->len == 0U) {
++					continue;
++				}
++				data->cur_reg = msg->buf[i++];
++			}
++			for (; i < msg->len; i++) {
++				lsm6dsl_emul_write_reg(data,
++						       data->cur_reg++ % LSM6DSL_EMUL_REG_COUNT,
++						       msg->buf[i]);
++			}
++		}
++		int1 = lsm6dsl_emul_int1_active(data);
++	}
++
++	lsm6dsl_emul_update_int1(target, int1);
++
++	return 0;
++}
++
++void lsm6dsl_emul_set_reg(const struct emul *target, uint8_t reg_addr, const uint8_t *val,
++			  size_t count)
++{
++	struct lsm6dsl_emul_data *data = target->data;
++
++	__ASSERT_NO_MSG(reg_addr + count <= LSM6DSL_EMUL_REG_COUNT);
++	K_SPINLOCK(&data->lock) {
++		memcpy(&data->reg[reg_addr], val, count);
++	}
++}
++
++void lsm6dsl_emul_get_reg(const struct emul *target, uint8_t reg_addr, uint8_t *val, size_t count)
++{
++	struct lsm6dsl_emul_data *data = target->data;
++
++	__ASSERT_NO_MSG(reg_addr + count <= LSM6DSL_EMUL_REG_COUNT);
++	K_SPINLOCK(&data->lock) {
++		memcpy(val, &data->reg[reg_addr], count);
++	}
++}
++
++void lsm6dsl_emul_wake_up(const struct emul *target)
++{
++	struct lsm6dsl_emul_data *data = target->data;
++	bool int1 = false;
++
++	K_SPINLOCK(&data->lock) {
++		bool accel_on =
++			(data->reg[LSM6DSL_REG_CTRL1_XL] & LSM6DSL_MASK_CTRL1_XL_ODR_XL) != 0U;
++		bool int_enabled = (data->reg[LSM6DSL_REG_TAP_CFG] &
++				    LSM6DSL_MASK_TAP_CFG_INTERRPUTS_ENABLE) != 0U;
++
++		if (accel_on && int_enabled) {
++			data->reg[LSM6DSL_REG_WAKE_UP_SRC] =
++				LSM6DSL_MASK_WAKE_UP_SRC_WU_IA | LSM6DSL_MASK_WAKE_UP_SRC_X_WU;
++		}
++		int1 = lsm6dsl_emul_int1_active(data);
++	}
++
++	lsm6dsl_emul_update_int1(target, int1);
++}
++
++static int lsm6dsl_emul_init(const struct emul *target, const struct device *parent)
++{
++	struct lsm6dsl_emul_data *data = target->data;
++
++	ARG_UNUSED(parent);
++
++	lsm6dsl_emul_reset_regs(data);
++
++	return 0;
++}
++
++static const struct i2c_emul_api lsm6dsl_emul_api_i2c = {
++	.transfer = lsm6dsl_emul_transfer_i2c,
++};
++
++#define LSM6DSL_EMUL(n)                                                                            \
++	static struct lsm6dsl_emul_data lsm6dsl_emul_data_##n;                                     \
++	static const struct lsm6dsl_emul_cfg lsm6dsl_emul_cfg_##n = {                              \
++		.int1 = GPIO_DT_SPEC_INST_GET_OR(n, irq_gpios, {0}),                               \
++	};                                                                                         \
++	EMUL_DT_INST_DEFINE(n, lsm6dsl_emul_init, &lsm6dsl_emul_data_##n, &lsm6dsl_emul_cfg_##n,   \
++			    &lsm6dsl_emul_api_i2c, NULL)
++
++DT_INST_FOREACH_STATUS_OKAY(LSM6DSL_EMUL)
+diff --git a/drivers/sensor/st/lsm6dsl/lsm6dsl_emul.h b/drivers/sensor/st/lsm6dsl/lsm6dsl_emul.h
+new file mode 100644
+index 000000000..0940de152
+--- /dev/null
++++ b/drivers/sensor/st/lsm6dsl/lsm6dsl_emul.h
+@@ -0,0 +1,54 @@
++/*
++ * Copyright (c) 2026 Siddhant Modi
++ * SPDX-License-Identifier: Apache-2.0
++ */
++
++#ifndef ZEPHYR_DRIVERS_SENSOR_LSM6DSL_LSM6DSL_EMUL_H_
++#define ZEPHYR_DRIVERS_SENSOR_LSM6DSL_LSM6DSL_EMUL_H_
++
++#include <zephyr/drivers/emul.h>
++
++#include <stddef.h>
++#include <stdint.h>
++
++#ifdef __cplusplus
++extern "C" {
++#endif
++
++/**
++ * @brief Set one or more register values
++ *
++ * @param target The target emulator to modify
++ * @param reg_addr The starting address of the registers to modify
++ * @param val One or more bytes to write to the registers
++ * @param count The number of bytes to write
++ */
++void lsm6dsl_emul_set_reg(const struct emul *target, uint8_t reg_addr, const uint8_t *val,
++			  size_t count);
++
++/**
++ * @brief Get the values of one or more registers
++ *
++ * @param target The target emulator to read
++ * @param reg_addr The starting address of the registers to read
++ * @param val Buffer to write the register values into
++ * @param count The number of bytes to read
++ */
++void lsm6dsl_emul_get_reg(const struct emul *target, uint8_t reg_addr, uint8_t *val, size_t count);
++
++/**
++ * @brief Report a wake-up event (motion above the threshold)
++ *
++ * Takes effect only while the accelerometer is on and interrupts are enabled,
++ * as on the device: sets the wake-up source register and, if the wake-up
++ * interrupt is routed to INT1, drives INT1 high until the source is read.
++ *
++ * @param target The target emulator
++ */
++void lsm6dsl_emul_wake_up(const struct emul *target);
++
++#ifdef __cplusplus
++}
++#endif
++
++#endif /* ZEPHYR_DRIVERS_SENSOR_LSM6DSL_LSM6DSL_EMUL_H_ */
+diff --git a/drivers/sensor/st/lsm6dsl/lsm6dsl_trigger.c b/drivers/sensor/st/lsm6dsl/lsm6dsl_trigger.c
+index 0c3b1d377..167e56ed7 100644
+--- a/drivers/sensor/st/lsm6dsl/lsm6dsl_trigger.c
++++ b/drivers/sensor/st/lsm6dsl/lsm6dsl_trigger.c
+@@ -41,14 +41,35 @@ static inline void handle_irq(const struct device *dev)
+ #endif
+ }
+ 
++static int route_data_ready(const struct device *dev, bool enable)
++{
++	struct lsm6dsl_data *drv_data = dev->data;
++	uint8_t mask = LSM6DSL_MASK_INT1_CTRL_DRDY_XL | LSM6DSL_MASK_INT1_CTRL_DRDY_G;
++
++	return drv_data->hw_tf->update_reg(dev, LSM6DSL_REG_INT1_CTRL, mask, enable ? mask : 0);
++}
++
++static int route_wake_up(const struct device *dev, bool enable)
++{
++	struct lsm6dsl_data *drv_data = dev->data;
++
++	if (drv_data->hw_tf->update_reg(dev, LSM6DSL_REG_TAP_CFG,
++					LSM6DSL_MASK_TAP_CFG_INTERRPUTS_ENABLE,
++					enable ? LSM6DSL_MASK_TAP_CFG_INTERRPUTS_ENABLE : 0) < 0) {
++		return -EIO;
++	}
++
++	return drv_data->hw_tf->update_reg(dev, LSM6DSL_REG_MD1_CFG, LSM6DSL_MASK_MD1_CFG_INT1_WU,
++					   enable ? LSM6DSL_MASK_MD1_CFG_INT1_WU : 0);
++}
++
+ int lsm6dsl_trigger_set(const struct device *dev,
+ 			const struct sensor_trigger *trig,
+ 			sensor_trigger_handler_t handler)
+ {
+ 	const struct lsm6dsl_config *config = dev->config;
+ 	struct lsm6dsl_data *drv_data = dev->data;
+-
+-	__ASSERT_NO_MSG(trig->type == SENSOR_TRIG_DATA_READY);
++	int ret;
+ 
+ 	/* If irq_gpio is not configured in DT just return error */
+ 	if (!config->int_gpio.port) {
+@@ -56,14 +77,30 @@ int lsm6dsl_trigger_set(const struct device *dev,
+ 		return -ENOTSUP;
+ 	}
+ 
++	if (trig->type != SENSOR_TRIG_DATA_READY && trig->type != SENSOR_TRIG_MOTION) {
++		return -ENOTSUP;
++	}
++
+ 	setup_irq(dev, false);
+ 
+-	drv_data->data_ready_handler = handler;
+-	if (handler == NULL) {
+-		return 0;
++	if (trig->type == SENSOR_TRIG_DATA_READY) {
++		drv_data->data_ready_handler = handler;
++		drv_data->data_ready_trigger = trig;
++		ret = route_data_ready(dev, handler != NULL);
++	} else {
++		drv_data->motion_handler = handler;
++		drv_data->motion_trigger = trig;
++		ret = route_wake_up(dev, handler != NULL);
+ 	}
+ 
+-	drv_data->data_ready_trigger = trig;
++	if (ret < 0) {
++		LOG_ERR("Could not route the interrupt.");
++		return -EIO;
++	}
++
++	if (drv_data->data_ready_handler == NULL && drv_data->motion_handler == NULL) {
++		return 0;
++	}
+ 
+ 	setup_irq(dev, true);
+ 	if (gpio_pin_get_dt(&config->int_gpio) > 0) {
+@@ -73,6 +110,36 @@ int lsm6dsl_trigger_set(const struct device *dev,
+ 	return 0;
+ }
+ 
++int lsm6dsl_wake_up_threshold_set(const struct device *dev, const struct sensor_value *val)
++{
++	struct lsm6dsl_data *drv_data = dev->data;
++	/* One step of the threshold is 1/64 of the full scale, i.e. 2^9 LSBs */
++	int64_t step_ug = (int64_t)(drv_data->accel_sensitivity * 512.0f);
++	int64_t threshold = (sensor_ms2_to_ug(val) + step_ug / 2) / step_ug;
++
++	if (threshold < 0 || threshold > LSM6DSL_MASK_WAKE_UP_THS_WK_THS) {
++		return -EINVAL;
++	}
++
++	return drv_data->hw_tf->update_reg(dev, LSM6DSL_REG_WAKE_UP_THS,
++					   LSM6DSL_MASK_WAKE_UP_THS_WK_THS,
++					   (uint8_t)threshold << LSM6DSL_SHIFT_WAKE_UP_THS_WK_THS);
++}
++
++int lsm6dsl_wake_up_duration_set(const struct device *dev, const struct sensor_value *val)
++{
++	struct lsm6dsl_data *drv_data = dev->data;
++
++	/* In samples at the accelerometer's data rate */
++	if (val->val1 < 0 || val->val1 > 3) {
++		return -EINVAL;
++	}
++
++	return drv_data->hw_tf->update_reg(dev, LSM6DSL_REG_WAKE_UP_DUR,
++					   LSM6DSL_MASK_WAKE_UP_DUR_WAKE_DUR,
++					   val->val1 << LSM6DSL_SHIFT_WAKE_UP_DUR_WAKE_DUR);
++}
++
+ static void lsm6dsl_gpio_callback(const struct device *dev,
+ 				  struct gpio_callback *cb, uint32_t pins)
+ {
+@@ -87,8 +154,28 @@ static void lsm6dsl_gpio_callback(const struct device *dev,
+ static void lsm6dsl_thread_cb(const struct device *dev)
+ {
+ 	struct lsm6dsl_data *drv_data = dev->data;
++	uint8_t status = LSM6DSL_MASK_STATUS_REG_XLDA | LSM6DSL_MASK_STATUS_REG_GDA;
++
++	if (drv_data->motion_handler != NULL) {
++		uint8_t wake_up_src = 0;
++
++		/* Reading the source also clears a latched wake-up interrupt */
++		if (drv_data->hw_tf->read_reg(dev, LSM6DSL_REG_WAKE_UP_SRC, &wake_up_src) < 0) {
++			LOG_ERR("Could not read the wake-up source.");
++		} else if ((wake_up_src & LSM6DSL_MASK_WAKE_UP_SRC_WU_IA) != 0U) {
++			drv_data->motion_handler(dev, drv_data->motion_trigger);
++		}
++
++		/* The interrupt may be either: only report data ready if there is new data */
++		if (drv_data->data_ready_handler != NULL &&
++		    drv_data->hw_tf->read_reg(dev, LSM6DSL_REG_STATUS_REG, &status) < 0) {
++			LOG_ERR("Could not read the status.");
++			status = 0;
++		}
++	}
+ 
+-	if (drv_data->data_ready_handler != NULL) {
++	if (drv_data->data_ready_handler != NULL &&
++	    (status & (LSM6DSL_MASK_STATUS_REG_XLDA | LSM6DSL_MASK_STATUS_REG_GDA)) != 0U) {
+ 		drv_data->data_ready_handler(dev,
+ 					     drv_data->data_ready_trigger);
+ 	}
+@@ -142,17 +229,6 @@ int lsm6dsl_init_interrupt(const struct device *dev)
+ 		return -EIO;
+ 	}
+ 
+-	/* enable data-ready interrupt */
+-	if (drv_data->hw_tf->update_reg(dev,
+-			       LSM6DSL_REG_INT1_CTRL,
+-			       LSM6DSL_MASK_INT1_CTRL_DRDY_XL |
+-			       LSM6DSL_MASK_INT1_CTRL_DRDY_G,
+-			       BIT(LSM6DSL_SHIFT_INT1_CTRL_DRDY_XL) |
+-			       BIT(LSM6DSL_SHIFT_INT1_CTRL_DRDY_G)) < 0) {
+-		LOG_ERR("Could not enable data-ready interrupt.");
+-		return -EIO;
+-	}
+-
+ 	drv_data->dev = dev;
+ 
+ #if defined(CONFIG_LSM6DSL_TRIGGER_OWN_THREAD)
+@@ -167,7 +243,6 @@ int lsm6dsl_init_interrupt(const struct device *dev)
+ 	drv_data->work.handler = lsm6dsl_work_cb;
+ #endif
+ 
+-	setup_irq(dev, true);
+-
++	/* Interrupts are routed to INT1 and enabled once a trigger is set */
+ 	return 0;
+ }
+diff --git a/tests/drivers/sensor/lsm6dsl/CMakeLists.txt b/tests/drivers/sensor/lsm6dsl/CMakeLists.txt
+new file mode 100644
+index 000000000..1b24aef3e
+--- /dev/null
++++ b/tests/drivers/sensor/lsm6dsl/CMakeLists.txt
+@@ -0,0 +1,8 @@
++# Copyright (c) 2026 Siddhant Modi
++# SPDX-License-Identifier: Apache-2.0
++
++cmake_minimum_required(VERSION 3.20.0)
++find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
++project(device)
++
++target_sources(app PRIVATE src/main.c)
+diff --git a/tests/drivers/sensor/lsm6dsl/boards/native_sim.overlay b/tests/drivers/sensor/lsm6dsl/boards/native_sim.overlay
+new file mode 100644
+index 000000000..1f08f99e2
+--- /dev/null
++++ b/tests/drivers/sensor/lsm6dsl/boards/native_sim.overlay
+@@ -0,0 +1,11 @@
++/* Copyright (c) 2026 Siddhant Modi
++ * SPDX-License-Identifier: Apache-2.0
++ */
++
++&i2c0 {
++	lsm6dsl: lsm6dsl@6a {
++		compatible = "st,lsm6dsl";
++		reg = <0x6a>;
++		irq-gpios = <&gpio0 6 GPIO_ACTIVE_HIGH>;
++	};
++};
+diff --git a/tests/drivers/sensor/lsm6dsl/boards/native_sim_native_64.overlay b/tests/drivers/sensor/lsm6dsl/boards/native_sim_native_64.overlay
+new file mode 100644
+index 000000000..1f08f99e2
+--- /dev/null
++++ b/tests/drivers/sensor/lsm6dsl/boards/native_sim_native_64.overlay
+@@ -0,0 +1,11 @@
++/* Copyright (c) 2026 Siddhant Modi
++ * SPDX-License-Identifier: Apache-2.0
++ */
++
++&i2c0 {
++	lsm6dsl: lsm6dsl@6a {
++		compatible = "st,lsm6dsl";
++		reg = <0x6a>;
++		irq-gpios = <&gpio0 6 GPIO_ACTIVE_HIGH>;
++	};
++};
+diff --git a/tests/drivers/sensor/lsm6dsl/prj.conf b/tests/drivers/sensor/lsm6dsl/prj.conf
+new file mode 100644
+index 000000000..eeb6aea27
+--- /dev/null
++++ b/tests/drivers/sensor/lsm6dsl/prj.conf
+@@ -0,0 +1,9 @@
++# Copyright (c) 2026 Siddhant Modi
++# SPDX-License-Identifier: Apache-2.0
++
++CONFIG_ZTEST=y
++
++CONFIG_SENSOR=y
++CONFIG_EMUL=y
++CONFIG_GPIO=y
++CONFIG_LSM6DSL_TRIGGER_GLOBAL_THREAD=y
+diff --git a/tests/drivers/sensor/lsm6dsl/src/main.c b/tests/drivers/sensor/lsm6dsl/src/main.c
+new file mode 100644
+index 000000000..58b4821b8
+--- /dev/null
++++ b/tests/drivers/sensor/lsm6dsl/src/main.c
+@@ -0,0 +1,166 @@
++/*
++ * Copyright (c) 2026 Siddhant Modi
++ * SPDX-License-Identifier: Apache-2.0
++ */
++
++#include <zephyr/device.h>
++#include <zephyr/devicetree.h>
++#include <zephyr/drivers/emul.h>
++#include <zephyr/drivers/gpio.h>
++#include <zephyr/drivers/sensor.h>
++#include <zephyr/kernel.h>
++#include <zephyr/ztest.h>
++
++#include "lsm6dsl.h"
++#include "lsm6dsl_emul.h"
++
++#define LSM6DSL_NODE DT_NODELABEL(lsm6dsl)
++
++static const struct device *const dev = DEVICE_DT_GET(LSM6DSL_NODE);
++static const struct emul *const emul = EMUL_DT_GET(LSM6DSL_NODE);
++static const struct gpio_dt_spec int1 = GPIO_DT_SPEC_GET(LSM6DSL_NODE, irq_gpios);
++
++static K_SEM_DEFINE(motion_sem, 0, 1);
++static K_SEM_DEFINE(data_ready_sem, 0, 1);
++
++static void motion_handler(const struct device *sensor, const struct sensor_trigger *trig)
++{
++	zassert_equal(sensor, dev);
++	zassert_equal(trig->type, SENSOR_TRIG_MOTION);
++	k_sem_give(&motion_sem);
++}
++
++static void data_ready_handler(const struct device *sensor, const struct sensor_trigger *trig)
++{
++	ARG_UNUSED(sensor);
++	zassert_equal(trig->type, SENSOR_TRIG_DATA_READY);
++	k_sem_give(&data_ready_sem);
++}
++
++static const struct sensor_trigger motion_trig = {
++	.type = SENSOR_TRIG_MOTION,
++	.chan = SENSOR_CHAN_ACCEL_XYZ,
++};
++
++static const struct sensor_trigger data_ready_trig = {
++	.type = SENSOR_TRIG_DATA_READY,
++	.chan = SENSOR_CHAN_ACCEL_XYZ,
++};
++
++static uint8_t get_reg(uint8_t reg)
++{
++	uint8_t val;
++
++	lsm6dsl_emul_get_reg(emul, reg, &val, 1);
++
++	return val;
++}
++
++static void start_accel(void)
++{
++	struct sensor_value odr = {.val1 = 26};
++
++	zassert_ok(
++		sensor_attr_set(dev, SENSOR_CHAN_ACCEL_XYZ, SENSOR_ATTR_SAMPLING_FREQUENCY, &odr));
++}
++
++static void lsm6dsl_before(void *fixture)
++{
++	ARG_UNUSED(fixture);
++
++	(void)sensor_trigger_set(dev, &motion_trig, NULL);
++	(void)sensor_trigger_set(dev, &data_ready_trig, NULL);
++	k_sem_reset(&motion_sem);
++	k_sem_reset(&data_ready_sem);
++}
++
++ZTEST(lsm6dsl, test_no_interrupt_routed_without_triggers)
++{
++	zassert_true(device_is_ready(dev));
++	zassert_equal(get_reg(LSM6DSL_REG_INT1_CTRL), 0);
++	zassert_equal(get_reg(LSM6DSL_REG_MD1_CFG), 0);
++}
++
++ZTEST(lsm6dsl, test_slope_threshold_sets_wake_up_threshold)
++{
++	/* 2 steps of 1/64 of +/-2 g, i.e. 62.5 mg */
++	struct sensor_value threshold;
++
++	sensor_ug_to_ms2(62500, &threshold);
++	zassert_ok(sensor_attr_set(dev, SENSOR_CHAN_ACCEL_XYZ, SENSOR_ATTR_SLOPE_TH, &threshold));
++	zassert_equal(get_reg(LSM6DSL_REG_WAKE_UP_THS) & LSM6DSL_MASK_WAKE_UP_THS_WK_THS, 2);
++}
++
++ZTEST(lsm6dsl, test_slope_threshold_out_of_range)
++{
++	struct sensor_value threshold;
++
++	sensor_g_to_ms2(3, &threshold);
++	zassert_equal(sensor_attr_set(dev, SENSOR_CHAN_ACCEL_XYZ, SENSOR_ATTR_SLOPE_TH, &threshold),
++		      -EINVAL);
++}
++
++ZTEST(lsm6dsl, test_slope_duration_sets_wake_up_duration)
++{
++	struct sensor_value duration = {.val1 = 2};
++
++	zassert_ok(sensor_attr_set(dev, SENSOR_CHAN_ACCEL_XYZ, SENSOR_ATTR_SLOPE_DUR, &duration));
++	zassert_equal(get_reg(LSM6DSL_REG_WAKE_UP_DUR) & LSM6DSL_MASK_WAKE_UP_DUR_WAKE_DUR,
++		      2 << LSM6DSL_SHIFT_WAKE_UP_DUR_WAKE_DUR);
++
++	duration.val1 = 4;
++	zassert_equal(sensor_attr_set(dev, SENSOR_CHAN_ACCEL_XYZ, SENSOR_ATTR_SLOPE_DUR, &duration),
++		      -EINVAL);
++}
++
++ZTEST(lsm6dsl, test_motion_trigger_routes_wake_up_to_int1)
++{
++	zassert_ok(sensor_trigger_set(dev, &motion_trig, motion_handler));
++	zassert_true(get_reg(LSM6DSL_REG_MD1_CFG) & LSM6DSL_MASK_MD1_CFG_INT1_WU);
++	zassert_true(get_reg(LSM6DSL_REG_TAP_CFG) & LSM6DSL_MASK_TAP_CFG_INTERRPUTS_ENABLE);
++	zassert_equal(get_reg(LSM6DSL_REG_INT1_CTRL), 0, "data ready must stay off INT1");
++
++	zassert_ok(sensor_trigger_set(dev, &motion_trig, NULL));
++	zassert_false(get_reg(LSM6DSL_REG_MD1_CFG) & LSM6DSL_MASK_MD1_CFG_INT1_WU);
++}
++
++ZTEST(lsm6dsl, test_motion_calls_handler)
++{
++	start_accel();
++	zassert_ok(sensor_trigger_set(dev, &motion_trig, motion_handler));
++
++	lsm6dsl_emul_wake_up(emul);
++
++	zassert_ok(k_sem_take(&motion_sem, K_MSEC(100)));
++	/* The handler's read of the source releases INT1 */
++	zassert_equal(gpio_pin_get_dt(&int1), 0);
++	zassert_equal(k_sem_take(&data_ready_sem, K_NO_WAIT), -EBUSY);
++}
++
++ZTEST(lsm6dsl, test_no_motion_without_handler)
++{
++	start_accel();
++
++	lsm6dsl_emul_wake_up(emul);
++
++	zassert_equal(k_sem_take(&motion_sem, K_MSEC(50)), -EAGAIN);
++}
++
++ZTEST(lsm6dsl, test_data_ready_trigger_routes_data_ready_to_int1)
++{
++	zassert_ok(sensor_trigger_set(dev, &data_ready_trig, data_ready_handler));
++	zassert_equal(get_reg(LSM6DSL_REG_INT1_CTRL),
++		      LSM6DSL_MASK_INT1_CTRL_DRDY_XL | LSM6DSL_MASK_INT1_CTRL_DRDY_G);
++
++	zassert_ok(sensor_trigger_set(dev, &data_ready_trig, NULL));
++	zassert_equal(get_reg(LSM6DSL_REG_INT1_CTRL), 0);
++}
++
++ZTEST(lsm6dsl, test_unsupported_trigger)
++{
++	struct sensor_trigger trig = {.type = SENSOR_TRIG_TAP, .chan = SENSOR_CHAN_ACCEL_XYZ};
++
++	zassert_equal(sensor_trigger_set(dev, &trig, motion_handler), -ENOTSUP);
++}
++
++ZTEST_SUITE(lsm6dsl, NULL, NULL, lsm6dsl_before, NULL, NULL);
+diff --git a/tests/drivers/sensor/lsm6dsl/testcase.yaml b/tests/drivers/sensor/lsm6dsl/testcase.yaml
+new file mode 100644
+index 000000000..99535e407
+--- /dev/null
++++ b/tests/drivers/sensor/lsm6dsl/testcase.yaml
+@@ -0,0 +1,17 @@
++# Copyright (c) 2026 Siddhant Modi
++# SPDX-License-Identifier: Apache-2.0
++
++common:
++  tags:
++    - drivers
++    - sensor
++  platform_allow:
++    - native_sim
++    - native_sim/native/64
++  integration_platforms:
++    - native_sim
++tests:
++  drivers.sensor.lsm6dsl: {}
++  drivers.sensor.lsm6dsl.trigger_own_thread:
++    extra_configs:
++      - CONFIG_LSM6DSL_TRIGGER_OWN_THREAD=y

@@ -7,8 +7,9 @@ project(test_power_manager)
 
 target_compile_options(app PRIVATE -Werror)
 
-# The Power class with a mocked PMIC and client (each component's own mock),
-# the app's real zbus channels and the real progressor encoding.
+# The Power and Activity classes with a mocked PMIC, IMU and client (each
+# component's own mock), the app's real zbus channels and the real progressor
+# encoding.
 target_include_directories(app PRIVATE
     ../inc
     ../src
@@ -16,6 +17,8 @@ target_include_directories(app PRIVATE
     ../../../modules/progressor/inc
     ../../../services/ble_svc/inc
     ../../../services/ble_svc/mocks
+    ../../../services/motion_svc/inc
+    ../../../services/motion_svc/mocks
     ../../../services/pmic_svc/inc
     ../../../services/pmic_svc/mocks
 )
@@ -23,6 +26,8 @@ target_include_directories(app PRIVATE
 target_sources(app PRIVATE
     ../../../channels/src/channels.cpp
     ../../../modules/progressor/src/progressor.cpp
+    ../src/activity.cpp
     ../src/power.cpp
+    src/test_activity.cpp
     src/test_power.cpp
 )

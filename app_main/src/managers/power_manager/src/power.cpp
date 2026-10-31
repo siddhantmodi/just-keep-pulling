@@ -20,13 +20,9 @@ LOG_MODULE_REGISTER( power_manager, CONFIG_APP_POWER_MANAGER_LOG_LEVEL );
 namespace power_manager
 {
 
-fw::Result<> Power::handle( const Event &event )
+fw::Result<> Power::check()
 {
-    switch( event.type ) {
-    case Event::Type::battery_check:
-        return state_ == State::powering_off ? power_off() : check_battery();
-    }
-    return std::unexpected( std::errc::invalid_argument );
+    return state_ == State::powering_off ? power_off() : check_battery();
 }
 
 void Power::monitor()

@@ -26,9 +26,14 @@ struct ClientConnection {
     bool connected;
 };
 
+/** @brief Whether a measurement is running (the load cell is sampling for the client). */
+struct MeasurementState {
+    bool measuring;
+};
+
 } // namespace channels
 
-ZBUS_CHAN_DECLARE( progressor_command_chan, client_connection_chan, battery_chan );
+ZBUS_CHAN_DECLARE( progressor_command_chan, client_connection_chan, measurement_state_chan, battery_chan );
 
 namespace channels
 {
@@ -36,6 +41,8 @@ namespace channels
 /** @brief Commands the client wrote to the Progressor control point, decoded. */
 inline constexpr fw::ChannelRef<progressor::Command> progressor_command{ progressor_command_chan };
 inline constexpr fw::ChannelRef<ClientConnection> client_connection{ client_connection_chan };
+/** @brief Published by the measurement manager when a measurement starts or stops. */
+inline constexpr fw::ChannelRef<MeasurementState> measurement_state{ measurement_state_chan };
 /** @brief The latest battery reading, published by the power manager at boot and then periodically. */
 inline constexpr fw::ChannelRef<hal::BatteryStatus> battery{ battery_chan };
 

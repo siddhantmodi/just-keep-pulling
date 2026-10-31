@@ -138,9 +138,16 @@ Tests construct a fresh instance per test with mocks: no singleton reset, no lin
 | `load_cell_svc` | `load-cell-adc` (ADS1220), settings (`load_cell/factor`, `load_cell/rate`) |
 | `pmic_svc` | `pmic-charger` and `pmic-regulators` (the nPM1300) |
 | `ble_svc` | `identity_svc::identity()`, channels `progressor_command` and `client_connection` (out) |
-| `measurement_manager` | `load_cell_svc::load_cell()`, `ble_svc::client()`, `identity_svc::identity()`, channels `progressor_command` and `client_connection` (in), `battery` (read) |
-| `power_manager` | `pmic_svc::pmic()`, `ble_svc::client()`, channel `battery` (out) |
+| `measurement_manager` | `load_cell_svc::load_cell()`, `ble_svc::client()`, `identity_svc::identity()`, channels `progressor_command` and `client_connection` (in), `measurement_state` (out), `battery` (read) |
+| `motion_svc` | `motion-sensor` (the IMU and its interrupt pin) |
+| `power_manager` | `pmic_svc::pmic()`, `motion_svc::motion()`, `ble_svc::client()`, channel `battery` (out), channels `progressor_command`, `client_connection` and `measurement_state` (in) |
 | `debug_shell` | `identity_svc::identity()`, `load_cell_svc::load_cell()` (the thread-safe sample rate only), channel `battery` (read) |
+
+## Changes to Zephyr and other dependencies
+
+A missing feature in an upstream driver is added to that driver, written to be submitted upstream, rather than worked around with a driver of our own. Until it is merged and in the NCS version we use, the change is carried as a patch: `zephyr/patches/` holds the files and `zephyr/patches.yml` lists them (Zephyr's `west patch` format), and `west_setup.sh` reverts and re-applies them around every `west update`. Each patch includes what upstream would ask for: an emulator and a test where the subsystem has them, and a commit message ready for the PR (add a `Signed-off-by` when submitting). Drivers for chips Zephyr has no driver for live in `drivers/`.
+
+Carried now: the LSM6DSL motion (wake-up) trigger, used to sleep when idle and wake on motion.
 
 ## Build variants
 

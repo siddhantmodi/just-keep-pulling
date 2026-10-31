@@ -236,6 +236,19 @@ TEST_F( MeasurementTest, StopSendsThePendingSamplesAndStopsTheLoadCell )
     EXPECT_FALSE( measurement_.measuring() );
 }
 
+TEST_F( MeasurementTest, PublishesWhenAMeasurementStartsAndStops )
+{
+    start_measuring();
+    auto state = channels::measurement_state.read();
+    ASSERT_TRUE( state );
+    EXPECT_TRUE( state->measuring );
+
+    ASSERT_TRUE( measurement_.handle( command( Opcode::stop_measurement ) ) );
+    state = channels::measurement_state.read();
+    ASSERT_TRUE( state );
+    EXPECT_FALSE( state->measuring );
+}
+
 TEST_F( MeasurementTest, StopWhenNotMeasuringDoesNothing )
 {
     EXPECT_CALL( load_cell_, stop() ).Times( 0 );

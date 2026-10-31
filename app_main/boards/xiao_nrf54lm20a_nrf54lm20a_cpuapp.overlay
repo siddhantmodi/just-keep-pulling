@@ -13,7 +13,17 @@
 	aliases {
 		pmic-charger = &pmic_charger;
 		pmic-regulators = &pmic_regulators;
+		motion-sensor = &lsm6ds3tr_c;
 	};
+};
+
+/*
+ * The LSM6DS3TR-C IMU (i2c30, INT1 on P0.06) is powered by the PMIC's LDO1,
+ * which starts after sensor init: the app initializes it later, as Seeed's IMU
+ * sample does. INT1 also wakes the SoC from System OFF.
+ */
+&lsm6ds3tr_c {
+	zephyr,deferred-init;
 };
 
 &pmic_i2c {

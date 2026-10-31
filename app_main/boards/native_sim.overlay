@@ -5,6 +5,7 @@
 		load-cell-adc = &load_cell_adc;
 		pmic-charger = &pmic_charger;
 		pmic-regulators = &pmic_regulators;
+		motion-sensor = &imu;
 	};
 };
 
@@ -43,5 +44,13 @@
 		pmic_regulators: regulators {
 			compatible = "nordic,npm1300-regulator";
 		};
+	};
+
+	/* The IMU, as on the XIAO: Zephyr's emulated LSM6DSL, initialized by the app. */
+	imu: lsm6dsl@6a {
+		compatible = "st,lsm6dsl";
+		reg = <0x6a>;
+		irq-gpios = <&gpio0 11 GPIO_ACTIVE_HIGH>;
+		zephyr,deferred-init;
 	};
 };

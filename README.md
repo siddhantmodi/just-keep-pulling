@@ -4,14 +4,15 @@ Zephyr RTOS based firmware for a dynamometer for measuring finger strength for r
 
 Built on the nRF Connect SDK (NCS) for the Seeed XIAO nRF54LM20A, in C++23, with GoogleTest unit tests and Bumble BLE integration tests that run on `native_sim`.
 
-The firmware is `app_main`: a finger-strength dynamometer for the Seeed XIAO nRF54LM20A with an ADS1220 load-cell ADC, compatible with the Tindeq Progressor app (Bluetooth protocol as implemented by [Crimpdeq](https://github.com/crimpdeq)). It advertises as `Progressor_NNNN` and answers the Progressor commands: tare, start/stop measurement (streaming timestamped samples), app version, Progressor ID, battery voltage (from the nPM1300 PMIC), shutdown, and Crimpdeq's add-calibration-point. On a low battery it sends the Progressor low-power warning and puts the PMIC in ship mode. Idle sleep, the LED and OTA updates are still to come; see `docs/architecture.md` for the patterns it follows and `docs/app_main.md` for how its parts connect.
+The firmware is `app_main`: a finger-strength dynamometer for the Seeed XIAO nRF54LM20A with an ADS1220 load-cell ADC, compatible with the Tindeq Progressor app (Bluetooth protocol as implemented by [Crimpdeq](https://github.com/crimpdeq)). It advertises as `Progressor_NNNN` and answers the Progressor commands: tare, start/stop measurement (streaming timestamped samples), app version, Progressor ID, battery voltage (from the nPM1300 PMIC), shutdown, and Crimpdeq's add-calibration-point. On a low battery it sends the Progressor low-power warning and puts the PMIC in ship mode. After 4 minutes idle (30 with the app connected) it sleeps until it is moved (IMU wake-on-motion). The LED and OTA updates are still to come; see `docs/architecture.md` for the patterns it follows and `docs/app_main.md` for how its parts connect.
 
 ## Repository layout
 
 ```
 west.yml              West manifest: sdk-nrf (allowlisted) and googletest, fetched into ../deps
-west_setup.sh         Initialize/update the west workspace (run by the devcontainer and CI)
+west_setup.sh         Initialize/update the west workspace and apply zephyr/patches.yml (run by the devcontainer and CI)
 zephyr/module.yml     This repo is a Zephyr module, so lib/, drivers/ and dts/ are available to every app and test
+zephyr/patches.yml    Upstreamable patches to dependencies (zephyr/patches/), applied by west_setup.sh (west patch)
 lib/
   fw/                 Header-only C++ helpers: fw::Result, fw::ChannelRef (zbus), fw::QueueRef (k_msgq), fw::ScopedLock, fw::settings
   hal/                Hardware capability interfaces (<hal/...>), Zephyr implementations (<hal/zephyr/...>), GoogleMocks (<hal/mocks/...>)
@@ -21,12 +22,12 @@ include/jkp/          Their headers; dts/bindings/ holds their devicetree bindin
 docs/architecture.md  Design rules, layers, why C++, and when to revisit them
 docs/app_main.md      app_main's class diagram (Mermaid): interfaces, implementations, modules, drivers
 app_main/             The dynamometer firmware (XIAO nRF54LM20A; native_sim for tests)
-  boards/             Devicetree overlays per board (aliases load-cell-adc, pmic-charger, pmic-regulators: the real chips or their emulators)
+  boards/             Devicetree overlays per board (aliases load-cell-adc, pmic-charger, pmic-regulators, motion-sensor: the real chips or their emulators)
   debug.conf          Debug build variant: adds the shell
   src/main.cpp
   src/channels/       zbus channels: the message contracts shared by every layer
   src/managers/       Own a thread and an event queue (measurement_manager, power_manager)
-  src/services/       One subsystem or peripheral each (identity_svc, load_cell_svc, ble_svc, pmic_svc)
+  src/services/       One subsystem or peripheral each (identity_svc, load_cell_svc, ble_svc, pmic_svc, motion_svc)
   src/modules/        Pure logic, no Zephyr (calibration, progressor)
   src/debug_shell/    "jkp" shell commands, debug builds only
     <component>/      Each component:
@@ -98,7 +99,7 @@ scripts/run_clang_tidy.py
 | Job | What it does |
 |---|---|
 | `format` | `scripts/check_format.sh` and `scripts/check_layering.sh` |
-| `unit` | Twister unit tests on `native_sim/native/64` with coverage, ASan and UBSan; uploads results and the coverage report |
+| `unit` | Twister unit tests on `native_sim/native/64` with coverage, ASan and UBSan, then the Zephyr tests that come with `zephyr/patches.yml`; uploads results and the coverage report |
 | `integration` | Twister integration tests (Bumble over BLE) on `native_sim/native/64` after `unit`; uploads results and app logs |
 | `tidy` | `scripts/run_clang_tidy.py` for each app |
 | `build` | Builds each app for its boards once the checks pass (release, and debug for `app_main`; fails if a release build has the shell); uploads `.hex`/`.bin`/`.elf`, `.config` and checksums |

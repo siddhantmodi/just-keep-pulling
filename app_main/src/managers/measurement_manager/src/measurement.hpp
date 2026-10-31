@@ -121,6 +121,8 @@ private:
      */
     void send_batch();
     fw::Result<> reply( const progressor::Packet &packet );
+    /** @brief Publish channels::measurement_state, e.g. so the power manager doesn't sleep mid-measurement. */
+    void publish_state() const;
     /** @brief Samples per batch: what one notification carries, and no more than max_batch_duration of them. */
     [[nodiscard]] std::size_t batch_capacity() const;
 

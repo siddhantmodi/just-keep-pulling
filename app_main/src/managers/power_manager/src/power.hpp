@@ -1,10 +1,9 @@
 /**
  * @file power.hpp
- * @brief power_manager::Power: the power manager's logic, with no thread or timer of its own.
+ * @brief power_manager::Power: the battery side of the power manager's logic, with no thread or timer of its own.
  *
- * The manager thread (power_manager.cpp) hands it Events and, after each,
- * schedules the next battery check after next_check(). Tests call handle()
- * directly.
+ * The manager thread (power_manager.cpp) calls check() when its battery timer
+ * fires, then sets the timer to next_check(). Tests call check() directly.
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -18,7 +17,6 @@
 #include <cstdint>
 #include <fw/error.hpp>
 #include <hal/battery_charger.hpp>
-#include <type_traits>
 
 namespace power_manager
 {
@@ -38,17 +36,6 @@ inline constexpr std::chrono::milliseconds warning_delay{ 500 };
     return status.millivolts <= low_battery_mv && !status.charging && !status.external_power;
 }
 
-/** @brief One thing for the manager to handle. Only the battery check so far; idle timeouts will join it. */
-struct Event {
-    enum class Type : std::uint8_t {
-        battery_check,
-    };
-
-    Type type;
-};
-
-static_assert( std::is_trivially_copyable_v<Event>, "events are copied through a k_msgq" );
-
 class Power
 {
 public:
@@ -58,7 +45,8 @@ public:
     {
     }
 
-    [[nodiscard]] fw::Result<> handle( const Event &event );
+    /** @brief Read and publish the battery, and act on a low reading. */
+    [[nodiscard]] fw::Result<> check();
 
     /** @brief When to check the battery next: the interval, or sooner to confirm a low reading or power off. */
     [[nodiscard]] std::chrono::milliseconds next_check() const noexcept

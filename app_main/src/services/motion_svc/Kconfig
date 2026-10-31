@@ -1,0 +1,26 @@
+# SPDX-License-Identifier: Apache-2.0
+
+config APP_MOTION_SVC
+	bool "Motion service"
+	depends on SENSOR && GPIO
+	help
+	  The IMU as a motion detector: whether the device moved, and sleeping
+	  (System OFF) until it moves.
+
+if APP_MOTION_SVC
+
+config APP_MOTION_SVC_THRESHOLD_MILLI_G
+	int "Motion threshold (mg)"
+	default 63
+	help
+	  The change of acceleration that counts as motion. The LSM6DS3TR-C
+	  resolves 1/64 of its +/-2 g range, about 31 mg. To tune on the
+	  device: too low and vibration keeps it awake, too high and picking it
+	  up doesn't wake it.
+
+endif # APP_MOTION_SVC
+
+# Outside "if APP_MOTION_SVC" so the unit test gets the log level too.
+module = APP_MOTION_SVC
+module-str = motion_svc
+source "subsys/logging/Kconfig.template.log_config"

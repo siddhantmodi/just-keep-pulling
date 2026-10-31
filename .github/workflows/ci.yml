@@ -64,6 +64,18 @@ jobs:
             -v \
             --outdir twister-unit
 
+      # The patches in zephyr/patches.yml bring their own Zephyr tests.
+      - name: Run the tests of our Zephyr patches
+        run: |
+          west twister \
+            -T ../deps/zephyr/tests/drivers/sensor/lsm6dsl \
+            -p "$NATIVE_BOARD" \
+            --enable-asan \
+            --enable-ubsan \
+            --inline-logs \
+            -v \
+            --outdir twister-patches
+
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v7

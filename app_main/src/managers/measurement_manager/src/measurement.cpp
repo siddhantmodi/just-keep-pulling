@@ -134,6 +134,7 @@ fw::Result<> Measurement::start_measurement()
     origin_us_.reset();
     batch_size_ = 0;
     read_failures_ = 0;
+    publish_state();
     LOG_INF( "measuring at %u SPS, %u samples per notification", hal::samples_per_second( rate ), static_cast<unsigned>( batch_capacity() ) );
 
     if( auto ret = client_.set_streaming( true ); !ret && !no_listener( ret.error() ) ) {
@@ -152,6 +153,7 @@ fw::Result<> Measurement::stop_measurement( bool send_pending )
     }
     batch_size_ = 0;
     rate_.reset();
+    publish_state();
 
     auto stopped = load_cell_.stop();
     LOG_INF( "measurement stopped: %u samples lost, %u batches dropped so far", static_cast<unsigned>( load_cell_.lost_samples() ),
@@ -215,6 +217,13 @@ void Measurement::send_batch()
         return;
     }
     LOG_ERR( "samples not sent: %d", fw::err::to_zephyr( sent.error() ) );
+}
+
+void Measurement::publish_state() const
+{
+    if( auto ret = channels::measurement_state.publish( { .measuring = measuring() } ); !ret ) {
+        LOG_ERR( "measurement state publish failed: %d", fw::err::to_zephyr( ret.error() ) );
+    }
 }
 
 fw::Result<> Measurement::reply( const progressor::Packet &packet )

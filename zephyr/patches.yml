@@ -1,0 +1,22 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Patches to west projects, applied by west_setup.sh with "west patch apply"
+# (schema: zephyr/scripts/schemas/patch-schema.yml). Each is meant to go
+# upstream; drop it once the NCS version we use includes it. "module" is the
+# project's path in the workspace (dependencies live in deps/).
+#
+# After editing a patch: update its sha256sum (sha256sum <file>).
+
+patches:
+  - path: zephyr/0001-drivers-sensor-lsm6dsl-add-motion-trigger.patch
+    sha256sum: 8a88df38a1f9b006d07a6e50674a1c0b9e1da400ce869b57cc2fc737e0bce47d
+    module: deps/zephyr
+    author: Siddhant Modi
+    email: siddhant.modi@gmail.com
+    date: 2026-10-31
+    upstreamable: true
+    comments: |
+      SENSOR_TRIG_MOTION (the chip's wake-up interrupt) for the LSM6DSL
+      driver, which also runs the XIAO nRF54LM20A's LSM6DS3TR-C, plus an
+      emulator and a test. app_main uses it for inactivity sleep and
+      wake-on-motion. To submit as a Zephyr PR, after a Signed-off-by.

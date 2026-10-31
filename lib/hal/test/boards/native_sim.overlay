@@ -42,4 +42,14 @@
 			compatible = "nordic,npm1300-regulator";
 		};
 	};
+
+	/* Zephyr's LSM6DSL driver (patched with a motion trigger) against its emulator.
+	 * Deferred, as on the XIAO, where the PMIC powers the sensor after sensor init.
+	 */
+	imu: lsm6dsl@6a {
+		compatible = "st,lsm6dsl";
+		reg = <0x6a>;
+		irq-gpios = <&gpio0 11 GPIO_ACTIVE_HIGH>;
+		zephyr,deferred-init;
+	};
 };

@@ -2,7 +2,7 @@
 
 How `app_main`'s interfaces, classes, modules and drivers fit together, and what each offers. Keep this diagram in step with the code: a change to an interface or a new component updates it in the same commit.
 
-Conventions: `<<interface>>` classes are the seams that tests mock; a solid arrow is a reference held by an object, a dashed arrow is a call or use. Methods return `fw::Result` (`Result~T~` here) unless shown otherwise. Mocks (`hal::mocks::MockLoadCellAdc`, `MockBatteryCharger`, `MockPowerOff`, `load_cell_svc::MockLoadCell`, `ble_svc::MockClient`, `pmic_svc::MockPmic`) implement each interface for unit tests and are left out to keep the diagram readable.
+Conventions: `<<interface>>` classes are the seams that tests mock; a solid arrow is a reference held by an object, a dashed arrow is a call or use. Methods return `fw::Result` (`Result~T~` here) unless shown otherwise. Mocks (`hal::mocks::MockLoadCellAdc`, `MockBatteryCharger`, `MockPowerOff`, `MockMotionSensor`, `load_cell_svc::MockLoadCell`, `ble_svc::MockClient`, `pmic_svc::MockPmic`, `motion_svc::MockMotion`) implement each interface for unit tests and are left out to keep the diagram readable.
 
 ```mermaid
 classDiagram
@@ -31,10 +31,18 @@ classDiagram
 
     namespace power_manager {
         class Power {
-            <<manager thread>>
-            +handle(Event) Result
+            <<manager thread: battery>>
+            +check() Result
             +next_check() milliseconds
             is_low(BatteryStatus) bool
+        }
+        class Activity {
+            <<manager thread: inactivity>>
+            +on_command(Opcode)
+            +on_client_connection(bool)
+            +on_measurement(bool)
+            +check() Result
+            +idle() seconds
         }
     }
 
@@ -118,6 +126,16 @@ classDiagram
         class Pmic
     }
 
+    namespace motion_svc {
+        class IMotion {
+            <<interface>>
+            +init() Result
+            +moved() bool
+            +sleep_until_moved() Result
+        }
+        class Motion
+    }
+
     namespace channels {
         class progressor_command {
             <<zbus>>
@@ -130,6 +148,10 @@ classDiagram
         class battery {
             <<zbus>>
             hal::BatteryStatus
+        }
+        class measurement_state {
+            <<zbus>>
+            bool measuring
         }
     }
 
@@ -203,6 +225,19 @@ classDiagram
             <<hal::zephyr>>
             regulator_parent_ship_mode()
         }
+        class IMotionSensor {
+            <<interface>>
+            +init() Result
+            +moved() bool
+        }
+        class SensorMotion {
+            <<hal::zephyr>>
+            SENSOR_TRIG_MOTION, slope threshold
+        }
+        class GpioWakeSystemOff {
+            <<hal::zephyr>>
+            sys_poweroff(), woken by a GPIO
+        }
     }
 
     namespace drivers {
@@ -218,6 +253,12 @@ classDiagram
             emulates the chip on the SPI emulator bus
             ads1220_emul_set_raw(raw)
             ads1220_emul_set_source(fn)
+        }
+        class lsm6dsl_driver {
+            <<Zephyr st,lsm6dsl, patched>>
+            SENSOR_TRIG_MOTION
+            SENSOR_ATTR_SLOPE_TH, SLOPE_DUR
+            lsm6dsl_emul on native_sim
         }
         class npm1300_emul {
             <<native_sim only>>
@@ -243,6 +284,9 @@ classDiagram
     IPmic <|.. Pmic
     IBatteryCharger <|.. Npm13xxCharger
     IPowerOff <|.. RegulatorShipMode
+    IPowerOff <|.. GpioWakeSystemOff
+    IMotion <|.. Motion
+    IMotionSensor <|.. SensorMotion
 
     main ..> IIdentity : identity()
     main ..> ILoadCell : load_cell()
@@ -251,6 +295,7 @@ classDiagram
     main ..> Measurement : measurement_manager start()
     main ..> IPmic : pmic() init
     main ..> Power : power_manager start()
+    main ..> IMotion : motion() init
     debug_shell ..> IIdentity
     debug_shell ..> ILoadCell : rate only
     debug_shell ..> battery : reads
@@ -271,6 +316,15 @@ classDiagram
     Power --> IPmic : pmic_
     Power --> IClient : low-power warning
     Power ..> battery : publishes
+    Activity --> IMotion : moved, sleep_until_moved
+    Activity --> IClient : disconnect when idle
+    progressor_command ..> Activity : listener, queue
+    client_connection ..> Activity : listener, queue
+    measurement_state ..> Activity : listener, queue
+    Measurement ..> measurement_state : publishes
+    Motion --> IMotionSensor : sensor_
+    Motion --> IPowerOff : system_off_
+    SensorMotion ..> lsm6dsl_driver
     Pmic --> IBatteryCharger : charger_
     Pmic --> IPowerOff : power_off_
     IBatteryCharger ..> BatteryStatus
@@ -289,6 +343,8 @@ The measurement manager's thread takes `Event`s off its queue (fed by a zbus lis
 
 The power manager's thread reads the battery every 30 s (its timer posts an `Event`) and publishes it on `channels::battery`, which the measurement manager answers 0x6F from. A reading at or below 3.3 V with no charging or USB power is confirmed 1 s later; then the client gets the 0x04 low-power warning and, 0.5 s later, the PMIC enters ship mode. It is the only caller of `IPmic`.
 
+The same thread tracks inactivity (`Activity`): a 10 s timer checks for motion and counts idle time, and commands (except battery polls), connections and measurements reset it; nothing counts while measuring. After 4 minutes idle (30 with a client connected), the client is disconnected and, 10 s later unless something happened meanwhile, the SoC enters System OFF, woken by the IMU's motion interrupt.
+
 ## Production wiring
 
 Each component's production file binds the concrete types (see `docs/architecture.md`, Component pattern):
@@ -297,7 +353,8 @@ Each component's production file binds the concrete types (see `docs/architectur
 |---|---|---|
 | `identity_svc::identity()` | `Identity` | settings key `identity/id` |
 | `measurement_manager::start()` | `Measurement` in `measurement_manager.cpp`, built on first use | `load_cell()`, `client()`, and the device ID as at boot; thread priority 2 |
-| `power_manager::start()` | `Power` in `power_manager.cpp`, built on first use | `pmic()`, `client()`; thread priority 7 |
+| `power_manager::start()` | `Power` and `Activity` in `power_manager.cpp`, built on first use | `pmic()`, `motion()`, `client()`; idle timeouts from Kconfig; thread priority 7 |
+| `motion_svc::motion()` | `Motion` on `hal::zephyr::SensorMotion` and `GpioWakeSystemOff` | devicetree alias `motion-sensor`: the XIAO's LSM6DS3TR-C (Zephyr's LSM6DSL driver, patched; deferred init after the PMIC's LDO1), its INT1 (P0.06) waking the SoC; or the emulated chip on native_sim |
 | `pmic_svc::pmic()` | `Pmic` on `hal::zephyr::Npm13xxCharger` and `RegulatorShipMode` | devicetree aliases `pmic-charger` and `pmic-regulators`: the XIAO's nPM1300 (bit-banged I2C on P1.18/P1.17), or the emulated chip on native_sim |
 | `ble_svc::client()` | `Client` in `ble_svc.cpp` | Bluetooth: the Progressor GATT service, advertising as `Progressor_NNNN` (NNNN from the device ID) |
 | `load_cell_svc::load_cell()` | `LoadCell` on `hal::zephyr::Ads1220` | devicetree alias `load-cell-adc`: the ADS1220 on the XIAO's SPI (`/CS` P1.00, `/DRDY` P1.31), or the emulated chip on native_sim |

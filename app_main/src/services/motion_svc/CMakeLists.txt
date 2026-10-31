@@ -1,0 +1,8 @@
+# SPDX-License-Identifier: Apache-2.0
+
+target_include_directories(app PRIVATE inc)
+
+target_sources(app PRIVATE
+    src/motion.cpp
+    src/motion_svc.cpp
+)
