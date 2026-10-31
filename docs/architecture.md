@@ -128,6 +128,12 @@ Tests construct a fresh instance per test with mocks: no singleton reset, no lin
 | `app_manager` | `led_svc::led()`, channels `led_request` (in), `led_state` (out) |
 | `ble_svc` | `temp_svc::temperature()`, channels `led_request` (out), `led_state` (read) |
 
+## Build variants
+
+An app's default build is its **release** build. `debug.conf` (added with `-DEXTRA_CONF_FILE=debug.conf`) makes the **debug** build: it enables Zephyr's shell with the app's debug commands (`app_main/src/debug_shell/`, e.g. overwriting the device ID) and asserts. Debug-only code depends on `CONFIG_SHELL`, so it cannot reach a release build; CI builds both and fails if a release build enables the shell. clang-tidy analyzes the debug build, which contains everything the release build does.
+
+Shell commands run in the shell thread, so they only call services' thread-safe operations (documented on each), not the single-threaded ones a manager owns.
+
 ## Why C++ and not C
 
 The testability comes from the rules above, not from the language. The same layering could be written in C with link seams or structs of function pointers. C++ makes it cheaper and catches more mistakes at compile time.

@@ -39,6 +39,11 @@ protected:
     {
         ASSERT_TRUE( fw::settings::init() );
         (void)fw::settings::erase( load_cell_svc::factor_key );
+        (void)fw::settings::erase( load_cell_svc::rate_key );
+        // The mocked ADC offers the ADS1220's normal-mode rates.
+        ON_CALL( adc_, supports_rate( _ ) )
+            .WillByDefault( []( std::uint16_t rate )
+                            { return rate == 20 || rate == 45 || rate == 90 || rate == 175 || rate == 330 || rate == 600 || rate == 1000; } );
         // The mocked ADC reads raw_ with an increasing timestamp.
         ON_CALL( adc_, read( _ ) )
             .WillByDefault(
@@ -52,6 +57,7 @@ protected:
     void TearDown() override
     {
         (void)fw::settings::erase( load_cell_svc::factor_key );
+        (void)fw::settings::erase( load_cell_svc::rate_key );
     }
 
     void set_load( double kg, std::int32_t zero = 1000 )
@@ -225,6 +231,42 @@ TEST_F( LoadCellTest, ReadPassesAdcErrorsThrough )
     EXPECT_CALL( adc_, read( _ ) ).WillOnce( Return( fw::Result<LoadCellSample>{ std::unexpected( std::errc::operation_not_permitted ) } ) );
 
     EXPECT_EQ( load_cell_.read( std::chrono::milliseconds{ 1 } ).error(), std::errc::operation_not_permitted );
+}
+
+TEST_F( LoadCellTest, SampleRateDefaultsTo175 )
+{
+    ASSERT_TRUE( load_cell_.init() );
+
+    EXPECT_EQ( load_cell_.sample_rate(), 175 );
+}
+
+TEST_F( LoadCellTest, SetSampleRateSavesItForLaterBoots )
+{
+    ASSERT_TRUE( load_cell_.init() );
+
+    ASSERT_TRUE( load_cell_.set_sample_rate( 1000 ) );
+
+    EXPECT_EQ( load_cell_.sample_rate(), 1000 );
+    load_cell_svc::LoadCell next_boot{ adc_ };
+    ASSERT_TRUE( next_boot.init() );
+    EXPECT_EQ( next_boot.sample_rate(), 1000 );
+}
+
+TEST_F( LoadCellTest, SetSampleRateRejectsRatesTheAdcDoesNotOffer )
+{
+    ASSERT_TRUE( load_cell_.init() );
+
+    EXPECT_EQ( load_cell_.set_sample_rate( 100 ).error(), std::errc::not_supported );
+    EXPECT_EQ( load_cell_.sample_rate(), 175 );
+}
+
+TEST_F( LoadCellTest, InitIgnoresUnsupportedSavedRate )
+{
+    ASSERT_TRUE( fw::settings::save( load_cell_svc::rate_key, std::uint16_t{ 123 } ) );
+
+    ASSERT_TRUE( load_cell_.init() );
+
+    EXPECT_EQ( load_cell_.sample_rate(), 175 );
 }
 
 } // namespace

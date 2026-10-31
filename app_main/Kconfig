@@ -9,5 +9,8 @@ module-str = app_main
 source "subsys/logging/Kconfig.template.log_config"
 
 menu "Services"
+rsource "src/services/identity_svc/Kconfig"
 rsource "src/services/load_cell_svc/Kconfig"
 endmenu
+
+rsource "src/debug_shell/Kconfig"

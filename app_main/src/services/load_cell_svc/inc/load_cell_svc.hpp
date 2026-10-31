@@ -3,10 +3,11 @@
  * @brief Load-cell service public API: the ILoadCell interface and the app's load cell.
  *
  * Samples the load cell and converts readings to kg (tare, calibration
- * factor). The factor is saved in settings and loaded by init(); calibration
- * points are kept in RAM only, as in Crimpdeq.
+ * factor). The factor and the configured sample rate are saved in settings
+ * and loaded by init(); calibration points are kept in RAM only, as in Crimpdeq.
  *
- * Not thread-safe: call from a single thread (the measurement manager).
+ * Not thread-safe, apart from the configured sample rate: call from a single
+ * thread (the measurement manager).
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -30,8 +31,18 @@ struct ForceSample {
 class ILoadCell
 {
 public:
-    /** @brief Check the ADC and load the saved calibration factor (the default if none, or if implausible). */
+    /** @brief Check the ADC and load the saved factor and rate (the defaults if none, or if unusable). */
     [[nodiscard]] virtual fw::Result<> init() = 0;
+
+    /** @brief The configured sampling rate, saved in settings (default 175 SPS). */
+    [[nodiscard]] virtual std::uint16_t sample_rate() const = 0;
+
+    /**
+     * @brief Change and save the configured rate; it applies from the next
+     *        start(). Fails with not_supported for a rate the ADC does not offer.
+     *        Safe to call from another thread (e.g. the debug shell).
+     */
+    [[nodiscard]] virtual fw::Result<> set_sample_rate( std::uint16_t samples_per_second ) = 0;
 
     /** @brief Sample continuously. Fails with not_supported for a rate the ADC does not offer. */
     [[nodiscard]] virtual fw::Result<> start( std::uint16_t samples_per_second ) = 0;

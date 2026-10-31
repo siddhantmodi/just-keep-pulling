@@ -5,6 +5,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include "identity_svc.hpp"
 #include "load_cell_svc.hpp"
 
 #include <zephyr/app_version.h>
@@ -21,6 +22,10 @@ int main()
 
     if( auto ret = fw::settings::init(); !ret ) {
         LOG_ERR( "settings init failed: %d", fw::err::to_zephyr( ret.error() ) );
+    }
+
+    if( auto ret = identity_svc::identity().init(); !ret ) {
+        LOG_ERR( "identity init failed: %d", fw::err::to_zephyr( ret.error() ) );
     }
 
     if( auto ret = load_cell_svc::load_cell().init(); !ret ) {

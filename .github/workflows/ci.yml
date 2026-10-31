@@ -150,7 +150,7 @@ jobs:
         run: ccache --show-stats
 
   build:
-    name: Build ${{ matrix.app }} (${{ matrix.board }})
+    name: Build ${{ matrix.app }} (${{ matrix.board }}, ${{ matrix.variant }})
     needs: [format, unit, integration, tidy]
     runs-on: ubuntu-latest
     container:
@@ -159,25 +159,42 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # variant: release is the default build; debug adds the app's debug.conf (shell).
         include:
           - app: app_main
             board: xiao_nrf54lm20a/nrf54lm20a/cpuapp
             board_name: xiao_nrf54lm20a
+            variant: release
+          - app: app_main
+            board: xiao_nrf54lm20a/nrf54lm20a/cpuapp
+            board_name: xiao_nrf54lm20a
+            variant: debug
+            extra_args: -- -DEXTRA_CONF_FILE=debug.conf
           - app: app_template
             board: nrf54l15dk/nrf54l15/cpuapp
             board_name: nrf54l15dk
+            variant: release
     env:
-      BUILD_DIR: build/${{ matrix.app }}-${{ matrix.board_name }}
-      ARTIFACT_PREFIX: ${{ matrix.app }}-${{ matrix.board_name }}
+      BUILD_DIR: build/${{ matrix.app }}-${{ matrix.board_name }}-${{ matrix.variant }}
+      ARTIFACT_PREFIX: ${{ matrix.app }}-${{ matrix.board_name }}-${{ matrix.variant }}
     steps:
       - uses: actions/checkout@v6
 
       - uses: ./.github/actions/setup-west
         with:
-          ccache-key: build-${{ matrix.app }}-${{ matrix.board_name }}
+          ccache-key: build-${{ matrix.app }}-${{ matrix.board_name }}-${{ matrix.variant }}
 
       - name: Build firmware
-        run: west build -p always -b ${{ matrix.board }} -d "$BUILD_DIR" ${{ matrix.app }}
+        run: west build -p always -b ${{ matrix.board }} -d "$BUILD_DIR" ${{ matrix.app }} ${{ matrix.extra_args }}
+
+      - name: Check release builds have no shell
+        if: matrix.variant == 'release'
+        shell: bash
+        run: |
+          if grep -q '^CONFIG_SHELL=y' "$BUILD_DIR/${{ matrix.app }}/zephyr/.config"; then
+            echo "::error::release build of ${{ matrix.app }} enables the shell"
+            exit 1
+          fi
 
       - name: Collect firmware artifacts
         shell: bash
@@ -198,7 +215,7 @@ jobs:
       - name: Upload firmware
         uses: actions/upload-artifact@v7
         with:
-          name: firmware-${{ matrix.app }}-${{ matrix.board_name }}
+          name: firmware-${{ matrix.app }}-${{ matrix.board_name }}-${{ matrix.variant }}
           path: artifacts/*
           if-no-files-found: error
 

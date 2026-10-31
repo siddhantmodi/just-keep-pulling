@@ -45,6 +45,11 @@ public:
         return {};
     }
 
+    [[nodiscard]] bool supports_rate( std::uint16_t samples_per_second ) const override
+    {
+        return ads1220_supports_rate( samples_per_second );
+    }
+
     [[nodiscard]] fw::Result<> start( std::uint16_t samples_per_second ) override
     {
         return fw::err::check( ads1220_start( dev_, samples_per_second ) );

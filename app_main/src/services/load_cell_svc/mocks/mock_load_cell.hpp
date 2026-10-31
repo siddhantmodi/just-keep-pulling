@@ -22,6 +22,8 @@ class MockLoadCell : public ILoadCell
 {
 public:
     MOCK_METHOD( fw::Result<>, init, (), ( override ) );
+    MOCK_METHOD( std::uint16_t, sample_rate, (), ( const, override ) );
+    MOCK_METHOD( fw::Result<>, set_sample_rate, ( std::uint16_t samples_per_second ), ( override ) );
     MOCK_METHOD( fw::Result<>, start, ( std::uint16_t samples_per_second ), ( override ) );
     MOCK_METHOD( fw::Result<ForceSample>, read, ( std::chrono::microseconds timeout ), ( override ) );
     MOCK_METHOD( fw::Result<>, stop, (), ( override ) );

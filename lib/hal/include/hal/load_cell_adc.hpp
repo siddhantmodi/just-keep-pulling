@@ -30,6 +30,9 @@ public:
     /** @brief Check the ADC is usable. It stays powered down until start(). Fails with no_such_device. */
     [[nodiscard]] virtual fw::Result<> init() = 0;
 
+    /** @brief Whether start() accepts @p samples_per_second. */
+    [[nodiscard]] virtual bool supports_rate( std::uint16_t samples_per_second ) const = 0;
+
     /** @brief Convert continuously. Fails with not_supported for a rate the ADC does not offer. */
     [[nodiscard]] virtual fw::Result<> start( std::uint16_t samples_per_second ) = 0;
 

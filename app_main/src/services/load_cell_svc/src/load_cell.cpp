@@ -50,6 +50,34 @@ fw::Result<> LoadCell::init()
     } else {
         factor_ = *stored;
     }
+
+    auto rate = fw::settings::load<std::uint16_t>( rate_key );
+    if( rate && adc_.supports_rate( *rate ) ) {
+        configured_rate_ = *rate;
+    } else {
+        if( rate || rate.error() != std::errc::no_such_file_or_directory ) {
+            LOG_WRN( "saved sample rate unusable, using %u SPS", default_samples_per_second );
+        }
+        configured_rate_ = default_samples_per_second;
+    }
+    return {};
+}
+
+std::uint16_t LoadCell::sample_rate() const
+{
+    return configured_rate_;
+}
+
+fw::Result<> LoadCell::set_sample_rate( std::uint16_t samples_per_second )
+{
+    if( !adc_.supports_rate( samples_per_second ) ) {
+        return std::unexpected( std::errc::not_supported );
+    }
+    if( auto ret = fw::settings::save( rate_key, samples_per_second ); !ret ) {
+        return ret;
+    }
+    configured_rate_ = samples_per_second;
+    LOG_INF( "sample rate set to %u SPS", samples_per_second );
     return {};
 }
 

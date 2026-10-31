@@ -15,4 +15,8 @@ add_subdirectory(src/modules/calibration)
 add_subdirectory(src/modules/progressor)
 
 # Services: one subsystem or peripheral each, no thread of their own
+add_subdirectory_ifdef(CONFIG_APP_IDENTITY_SVC src/services/identity_svc)
 add_subdirectory_ifdef(CONFIG_APP_LOAD_CELL_SVC src/services/load_cell_svc)
+
+# Debug builds only (debug.conf)
+add_subdirectory_ifdef(CONFIG_APP_DEBUG_SHELL src/debug_shell)

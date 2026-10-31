@@ -163,6 +163,16 @@ TEST_F( Ads1220Test, SupportsEveryNormalModeRate )
     }
 }
 
+TEST_F( Ads1220Test, ReportsSupportedRates )
+{
+    for( std::uint16_t const rate : rates ) {
+        EXPECT_TRUE( adc_.supports_rate( rate ) ) << rate;
+    }
+    EXPECT_FALSE( adc_.supports_rate( 0 ) );
+    EXPECT_FALSE( adc_.supports_rate( 100 ) );
+    EXPECT_FALSE( adc_.supports_rate( 2000 ) );
+}
+
 TEST_F( Ads1220Test, RejectsUnsupportedRate )
 {
     auto ret = adc_.start( 100 );

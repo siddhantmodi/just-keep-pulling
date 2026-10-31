@@ -49,6 +49,9 @@ int ads1220_start( const struct device *dev, uint16_t samples_per_second );
  */
 int ads1220_read( const struct device *dev, struct ads1220_sample *sample, k_timeout_t timeout );
 
+/** @brief Whether @p samples_per_second is one of the rates ads1220_start() accepts. */
+bool ads1220_supports_rate( uint16_t samples_per_second );
+
 /** @brief Conversions overwritten before they were read, since the last start. */
 uint32_t ads1220_lost_samples( const struct device *dev );
 

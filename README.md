@@ -60,8 +60,12 @@ The west workspace topdir is the **parent** of this repo; dependencies live in `
 From the workspace topdir (`/home/user/workspace` in the devcontainer):
 
 ```sh
+# Release build (no shell)
 west build -b xiao_nrf54lm20a/nrf54lm20a/cpuapp -d build/app_main just-keep-pulling/app_main
 west flash -d build/app_main
+
+# Debug build: adds the shell on the console UART, with "jkp id" and "jkp rate" commands
+west build -b xiao_nrf54lm20a/nrf54lm20a/cpuapp -d build/app_main-debug just-keep-pulling/app_main -- -DEXTRA_CONF_FILE=debug.conf
 
 # The reference app, on the nRF54L15 DK
 west build -b nrf54l15dk/nrf54l15/cpuapp -d build/app_template just-keep-pulling/app_template
@@ -100,4 +104,4 @@ scripts/run_clang_tidy.py
 | `unit` | Twister unit tests on `native_sim/native/64` with coverage, ASan and UBSan; uploads results and the coverage report |
 | `integration` | Twister integration tests (Bumble over BLE) on `native_sim/native/64` after `unit`; uploads results and app logs |
 | `tidy` | `scripts/run_clang_tidy.py` for each app |
-| `build` | Builds each app for its boards once the checks pass; uploads `.hex`/`.bin`/`.elf`, `.config` and checksums |
+| `build` | Builds each app for its boards once the checks pass (release, and debug for `app_main`; fails if a release build has the shell); uploads `.hex`/`.bin`/`.elf`, `.config` and checksums |

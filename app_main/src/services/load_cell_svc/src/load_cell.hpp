@@ -11,6 +11,7 @@
 #include "load_cell_svc.hpp"
 
 #include <array>
+#include <atomic>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -22,8 +23,10 @@ namespace load_cell_svc
 
 /** @brief Settings key of the calibration factor. */
 inline constexpr const char *factor_key = "load_cell/factor";
+/** @brief Settings key of the configured sample rate. */
+inline constexpr const char *rate_key = "load_cell/rate";
 
-/** @brief Rate used to tare while not sampling (Crimpdeq's default rate). */
+/** @brief The configured rate until changed, and the rate used to tare while not sampling (Crimpdeq's default). */
 inline constexpr std::uint16_t default_samples_per_second = 175;
 inline constexpr std::chrono::milliseconds tare_duration{ 200 };
 
@@ -41,6 +44,8 @@ public:
     }
 
     [[nodiscard]] fw::Result<> init() override;
+    [[nodiscard]] std::uint16_t sample_rate() const override;
+    [[nodiscard]] fw::Result<> set_sample_rate( std::uint16_t samples_per_second ) override;
     [[nodiscard]] fw::Result<> start( std::uint16_t samples_per_second ) override;
     [[nodiscard]] fw::Result<ForceSample> read( std::chrono::microseconds timeout ) override;
     [[nodiscard]] fw::Result<> stop() override;
@@ -58,6 +63,7 @@ private:
     std::int32_t tare_{ 0 };
     float factor_{ calibration::default_factor };
     std::uint16_t running_rate_{ 0 }; // 0: stopped
+    std::atomic<std::uint16_t> configured_rate_{ default_samples_per_second };
     std::array<calibration::Point, max_calibration_points> points_{};
     std::size_t point_count_{ 0 };
 };
