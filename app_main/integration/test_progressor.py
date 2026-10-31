@@ -18,7 +18,15 @@ import pytest
 import pytest_asyncio
 from bumble.core import UUID
 from bumble.device import Connection, Peer
-from bumble.gatt import GATT_DEVICE_NAME_CHARACTERISTIC, Characteristic
+from bumble.gatt import (
+    GATT_BATTERY_LEVEL_CHARACTERISTIC,
+    GATT_DEVICE_NAME_CHARACTERISTIC,
+    GATT_FIRMWARE_REVISION_STRING_CHARACTERISTIC,
+    GATT_HARDWARE_REVISION_STRING_CHARACTERISTIC,
+    GATT_MANUFACTURER_NAME_STRING_CHARACTERISTIC,
+    GATT_MODEL_NUMBER_STRING_CHARACTERISTIC,
+    Characteristic,
+)
 from zephyr_bumble import connect_by_name, wait_for_log
 
 SERVICE_UUID = UUID("7e4e1701-1ea6-40c9-9dcc-13d34ffead57")
@@ -39,6 +47,9 @@ WEIGHT_MEASUREMENT = 0x01
 
 # The emulated nPM1300's battery (app_main/boards/native_sim.overlay), as the power manager last read it.
 EMULATED_BATTERY_MV = 3750
+
+# The Battery service's estimate for EMULATED_BATTERY_MV (ble_svc's battery_level.hpp).
+EMULATED_BATTERY_PERCENT = 25
 
 # The ATT MTU iOS negotiates, which carries 30 samples per notification.
 CLIENT_MTU = 247
@@ -293,3 +304,19 @@ async def test_a_link_dropped_at_once_leaves_the_device_usable(device, ble_dut, 
     async with asyncio.timeout(5):
         assert (await notifications.get())[2:] == b"2.0.4"
     await connection.disconnect()
+
+
+@pytest.mark.asyncio
+async def test_device_information_names_the_firmware(peer):
+    async def read(uuid):
+        return (await characteristic(peer, uuid).read_value()).decode()
+
+    assert await read(GATT_MANUFACTURER_NAME_STRING_CHARACTERISTIC) == "JustKeepPulling"
+    assert await read(GATT_MODEL_NUMBER_STRING_CHARACTERISTIC) == "JustKeepPulling"
+    assert await read(GATT_HARDWARE_REVISION_STRING_CHARACTERISTIC) == "native_sim"
+    assert re.fullmatch(r"\d+\.\d+\.\d+\+\d+", await read(GATT_FIRMWARE_REVISION_STRING_CHARACTERISTIC))
+
+
+@pytest.mark.asyncio
+async def test_battery_service_reports_the_level(peer):
+    assert await characteristic(peer, GATT_BATTERY_LEVEL_CHARACTERISTIC).read_value() == bytes([EMULATED_BATTERY_PERCENT])

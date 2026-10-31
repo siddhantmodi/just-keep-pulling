@@ -7,11 +7,14 @@ project(test_ble_svc)
 
 target_compile_options(app PRIVATE -Werror)
 
-# Only the advertised name is unit tested; the GATT adapter is covered by the
+# Only the advertised name and the battery level are unit tested; the GATT adapter is covered by the
 # Bumble integration tests (docs/architecture.md, rule 5).
 target_include_directories(app PRIVATE
     ../src
     ../../identity_svc/inc
 )
 
-target_sources(app PRIVATE src/test_advertising.cpp)
+target_sources(app PRIVATE
+    src/test_advertising.cpp
+    src/test_battery_level.cpp
+)

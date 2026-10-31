@@ -2,6 +2,10 @@
  * @file ble_svc.cpp
  * @brief BLE adapter: the Progressor GATT table, advertising, connection handling and the IClient implementation.
  *
+ * Also serves the standard Device Information service (configured in Kconfig)
+ * and Battery service (its level estimated from channels::battery), for
+ * generic apps such as nRF Connect.
+ *
  * Callbacks run in Bluetooth threads. A control point write is decoded
  * (progressor.hpp) and published to zbus for the measurement manager;
  * connection changes are published too. Notifications are sent from the
@@ -14,6 +18,7 @@
 #include "ble_svc.hpp"
 
 #include "advertising.hpp"
+#include "battery_level.hpp"
 #include "channels.hpp"
 #include "identity_svc.hpp"
 #include "progressor.hpp"
@@ -24,11 +29,14 @@
 #include <zephyr/bluetooth/gap.h>
 #include <zephyr/bluetooth/gatt.h>
 #include <zephyr/bluetooth/hci_types.h>
+#include <zephyr/bluetooth/services/bas.h>
 #include <zephyr/bluetooth/uuid.h>
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
+#include <zephyr/zbus/zbus.h>
 
 #include <array>
+#include <atomic>
 #include <cstdint>
 #include <expected>
 #include <fw/scoped_lock.hpp>
@@ -383,6 +391,36 @@ void on_att_mtu_updated( bt_conn * /*conn*/, std::uint16_t tx, std::uint16_t rx 
 bt_gatt_cb gatt_callbacks = {
     .att_mtu_updated = on_att_mtu_updated,
 };
+
+// The standard Battery service, for generic apps (e.g. nRF Connect); the
+// Progressor protocol has its own battery command.
+constinit std::atomic<std::uint8_t> battery_level{ 100 };
+
+void update_battery_service( k_work * /*work*/ )
+{
+    // On the system work queue, where a notification never waits for a buffer.
+    if( int const err = bt_bas_set_battery_level( battery_level.load( std::memory_order_relaxed ) ); err != 0 && err != -ENOTCONN ) {
+        LOG_DBG( "battery level not updated: %d", err );
+    }
+}
+
+/** @brief zbus listener on channels::battery: runs in the publisher's thread, so it only hands the level on. */
+void on_battery( const zbus_channel *chan );
+
+} // namespace
+
+K_WORK_DEFINE( ble_svc_battery_work, update_battery_service );
+ZBUS_LISTENER_DEFINE( ble_svc_battery_listener, on_battery );
+ZBUS_CHAN_ADD_OBS( battery_chan, ble_svc_battery_listener, 0 );
+
+namespace
+{
+
+void on_battery( const zbus_channel * /*chan*/ )
+{
+    battery_level.store( ble_svc::battery_level_percent( channels::battery.const_msg().millivolts ), std::memory_order_relaxed );
+    k_work_submit( &ble_svc_battery_work );
+}
 
 } // namespace
 
