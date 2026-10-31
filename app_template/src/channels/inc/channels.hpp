@@ -1,6 +1,6 @@
 /**
  * @file channels.hpp
- * @brief app_main's zbus channels: the message types components exchange and
+ * @brief app_template's zbus channels: the message types components exchange and
  *        a typed handle for each channel.
  *
  * Channels know nothing about their observers; each observer attaches itself

@@ -134,7 +134,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        app: [app_main]
+        app: [app_main, app_template]
     steps:
       - uses: actions/checkout@v6
 
@@ -161,6 +161,9 @@ jobs:
       matrix:
         include:
           - app: app_main
+            board: xiao_nrf54lm20a/nrf54lm20a/cpuapp
+            board_name: xiao_nrf54lm20a
+          - app: app_template
             board: nrf54l15dk/nrf54l15/cpuapp
             board_name: nrf54l15dk
     env:

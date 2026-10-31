@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""app_main's GATT service, end to end: BLE central -> ble_svc -> app manager -> led_svc / temp_svc."""
+"""app_template's GATT service, end to end: BLE central -> ble_svc -> app manager -> led_svc / temp_svc."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ SERVICE_UUID = UUID("9bb40001-b8c3-4eba-a5ac-7924595b107a")
 LED_UUID = UUID("9bb40002-b8c3-4eba-a5ac-7924595b107a")
 TEMPERATURE_UUID = UUID("9bb40003-b8c3-4eba-a5ac-7924595b107a")
 
-# app_main/boards/native_sim.overlay sets the emulated sensor to 25370 milli-degrees C.
+# app_template/boards/native_sim.overlay sets the emulated sensor to 25370 milli-degrees C.
 EMULATED_CENTICELSIUS = 2537
 
 ATT_ERROR_INVALID_ATTRIBUTE_LENGTH = 0x0D

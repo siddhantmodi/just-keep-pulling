@@ -1,5 +1,5 @@
 tests:
-  app_main.app_manager.unit:
+  app_template.temp_svc.unit:
     harness: gtest
     platform_allow:
       - native_sim
@@ -8,4 +8,4 @@ tests:
       - native_sim/native/64
     tags:
       - unit
-      - app_manager
+      - temp_svc

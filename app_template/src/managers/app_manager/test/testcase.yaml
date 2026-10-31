@@ -1,5 +1,5 @@
 tests:
-  app_main.ble_svc.unit:
+  app_template.app_manager.unit:
     harness: gtest
     platform_allow:
       - native_sim
@@ -8,4 +8,4 @@ tests:
       - native_sim/native/64
     tags:
       - unit
-      - ble_svc
+      - app_manager

@@ -75,11 +75,11 @@ Within an app, components follow the layering proven in cho03, one folder per la
 - **`modules/`** are pure logic with no Zephyr dependencies beyond `lib/fw`.
 - **`channels/`** holds the app's zbus channels: the message contracts shared by every layer.
 
-Dependencies point down: managers → services → modules. `scripts/check_layering.sh` fails CI if a service or module includes a manager's header, or a module includes a service's header or Zephyr. A component that more than one app needs moves out of `app_main` to a repo-level folder shared by all apps once a second app actually needs it.
+Dependencies point down: managers → services → modules. `scripts/check_layering.sh` fails CI if a service or module includes a manager's header, or a module includes a service's header or Zephyr. A component that more than one app needs moves out of its app to a repo-level folder shared by all apps once a second app actually needs it.
 
 ### Managers and zbus
 
-A manager has its own event queue (`fw::QueueRef<Event>` over a `k_msgq`). A zbus **listener** on each channel the manager cares about copies the message into the queue and returns. The manager thread takes events off the queue and calls its logic's `handle(const Event &)`, which is what tests call. `app_main/src/managers/app_manager/` is the reference.
+A manager has its own event queue (`fw::QueueRef<Event>` over a `k_msgq`). A zbus **listener** on each channel the manager cares about copies the message into the queue and returns. The manager thread takes events off the queue and calls its logic's `handle(const Event &)`, which is what tests call. `app_template/src/managers/app_manager/` is the reference.
 
 - **Every event is handled, in order**, with no allocation: the queue has fixed storage.
 - **One queue for everything.** Timer expiries and interrupts post events to the same queue, without zbus channels of their own.
@@ -97,7 +97,7 @@ Which zbus mechanism to use:
 
 ## Component pattern
 
-`app_main/src/services/led_svc/` is the reference:
+`app_template/src/services/led_svc/` is the reference:
 
 ```
 led_svc/

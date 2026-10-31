@@ -1,6 +1,6 @@
 /**
  * @file channels.cpp
- * @brief Definitions of app_main's zbus channels.
+ * @brief Definitions of app_template's zbus channels.
  *
  * SPDX-License-Identifier: Apache-2.0
  */
