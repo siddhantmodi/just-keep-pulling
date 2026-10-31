@@ -11,4 +11,8 @@ target_compile_options(app PRIVATE -Werror)
 target_sources(app PRIVATE src/main.cpp)
 
 # Modules: pure logic, no Zephyr
+add_subdirectory(src/modules/calibration)
 add_subdirectory(src/modules/progressor)
+
+# Services: one subsystem or peripheral each, no thread of their own
+add_subdirectory_ifdef(CONFIG_APP_LOAD_CELL_SVC src/services/load_cell_svc)

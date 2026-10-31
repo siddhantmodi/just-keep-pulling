@@ -1,0 +1,11 @@
+tests:
+  app_main.load_cell_svc.unit:
+    harness: gtest
+    platform_allow:
+      - native_sim
+      - native_sim/native/64
+    integration_platforms:
+      - native_sim/native/64
+    tags:
+      - unit
+      - load_cell_svc

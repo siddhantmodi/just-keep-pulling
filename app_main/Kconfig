@@ -7,3 +7,7 @@ endmenu
 module = APP_MAIN
 module-str = app_main
 source "subsys/logging/Kconfig.template.log_config"
+
+menu "Services"
+rsource "src/services/load_cell_svc/Kconfig"
+endmenu
