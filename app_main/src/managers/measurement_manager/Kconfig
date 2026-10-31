@@ -33,6 +33,15 @@ config APP_MEASUREMENT_MANAGER_QUEUE_DEPTH
 
 endif # APP_MEASUREMENT_MANAGER
 
+# Outside "if APP_MEASUREMENT_MANAGER" so the unit test has it too.
+config APP_MEASUREMENT_MANAGER_APP_VERSION
+	string "App version reported to the client"
+	default "2.0.4"
+	help
+	  The answer to the Progressor "get app version" command (0x6B). The
+	  Tindeq app identifies the model from it and the Progressor ID; the
+	  default is Crimpdeq's.
+
 # Outside "if APP_MEASUREMENT_MANAGER" so the unit test gets the log level too.
 module = APP_MEASUREMENT_MANAGER
 module-str = measurement_manager

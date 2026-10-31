@@ -29,8 +29,8 @@
 namespace measurement_manager
 {
 
-/** @brief The version reported to the client: Crimpdeq's, which the Tindeq app accepts. */
-inline constexpr std::string_view app_version = "2.0.4";
+/** @brief The version reported to the client (Kconfig; Crimpdeq's by default). */
+inline constexpr std::string_view app_version = CONFIG_APP_MEASUREMENT_MANAGER_APP_VERSION;
 
 /** @brief Longest time a batch collects samples, so low rates still update the client often (Crimpdeq's). */
 inline constexpr std::chrono::milliseconds max_batch_duration{ 50 };
