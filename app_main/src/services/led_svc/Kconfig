@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: Apache-2.0
+
+config APP_LED_SVC
+	bool "LED service"
+	depends on GPIO
+	help
+	  The RGB status LED, as three GPIO-driven LEDs.
+
+# Outside "if APP_LED_SVC" so the unit test gets the log level too.
+module = APP_LED_SVC
+module-str = led_svc
+source "subsys/logging/Kconfig.template.log_config"

@@ -7,7 +7,7 @@
  * measurements and motion are activity, and nothing counts while a
  * measurement runs. After the idle timeout (longer while a client is
  * connected, as Crimpdeq), the client is disconnected and, at the next check,
- * the device sleeps until it is moved.
+ * the device sleeps until it is moved, with the status LED off.
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -15,6 +15,7 @@
 #pragma once
 
 #include "ble_svc.hpp"
+#include "indicator.hpp"
 #include "motion_svc.hpp"
 #include "progressor.hpp"
 
@@ -35,9 +36,10 @@ struct IdleTimeouts {
 class Activity
 {
 public:
-    constexpr Activity( motion_svc::IMotion &motion, ble_svc::IClient &client, IdleTimeouts timeouts ) noexcept
+    constexpr Activity( motion_svc::IMotion &motion, ble_svc::IClient &client, Indicator &indicator, IdleTimeouts timeouts ) noexcept
         : motion_{ motion }
         , client_{ client }
+        , indicator_{ indicator }
         , timeouts_{ timeouts }
     {
     }
@@ -60,6 +62,7 @@ private:
 
     motion_svc::IMotion &motion_;
     ble_svc::IClient &client_;
+    Indicator &indicator_;
     IdleTimeouts timeouts_;
     std::chrono::seconds idle_{ 0 };
     bool connected_{ false };

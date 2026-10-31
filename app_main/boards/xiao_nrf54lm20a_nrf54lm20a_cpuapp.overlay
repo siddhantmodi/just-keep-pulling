@@ -14,7 +14,27 @@
 		pmic-charger = &pmic_charger;
 		pmic-regulators = &pmic_regulators;
 		motion-sensor = &lsm6ds3tr_c;
+		status-led-red = &red_led;
+		status-led-green = &green_led;
+		status-led-blue = &blue_led;
 	};
+};
+
+/*
+ * The RGB LED as Seeed's current board files have it: active low, red on
+ * P1.22 and blue on P1.23 (NCS's copy has them active high and swapped).
+ * The PWM LED nodes are not used here and are left as they are.
+ */
+&red_led {
+	gpios = <&gpio1 22 GPIO_ACTIVE_LOW>;
+};
+
+&green_led {
+	gpios = <&gpio1 24 GPIO_ACTIVE_LOW>;
+};
+
+&blue_led {
+	gpios = <&gpio1 23 GPIO_ACTIVE_LOW>;
 };
 
 /*

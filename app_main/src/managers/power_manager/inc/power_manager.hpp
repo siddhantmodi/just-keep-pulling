@@ -12,6 +12,9 @@
  * are activity): after 4 minutes idle, or 30 with a client connected, it
  * disconnects the client and sleeps (System OFF) until the device is moved.
  *
+ * And it drives the status LED, as Crimpdeq: blue without a client, green
+ * with one, red blinking on a low battery, off while asleep.
+ *
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -24,7 +27,7 @@ namespace power_manager
 
 /**
  * @brief Read and publish the battery, then start the manager thread. Call
- *        once the PMIC and the IMU are initialized, and before Bluetooth, so
+ *        once the PMIC, the IMU and the LED are initialized, and before Bluetooth, so
  *        the first battery request is answered with a reading.
  */
 [[nodiscard]] fw::Result<> start();

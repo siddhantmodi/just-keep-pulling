@@ -6,6 +6,26 @@
 		pmic-charger = &pmic_charger;
 		pmic-regulators = &pmic_regulators;
 		motion-sensor = &imu;
+		status-led-red = &red_led;
+		status-led-green = &green_led;
+		status-led-blue = &blue_led;
+	};
+
+	/* The status LED on emulated GPIOs. */
+	leds {
+		compatible = "gpio-leds";
+
+		red_led: red_led {
+			gpios = <&gpio0 12 GPIO_ACTIVE_LOW>;
+		};
+
+		green_led: green_led {
+			gpios = <&gpio0 13 GPIO_ACTIVE_LOW>;
+		};
+
+		blue_led: blue_led {
+			gpios = <&gpio0 14 GPIO_ACTIVE_LOW>;
+		};
 	};
 };
 

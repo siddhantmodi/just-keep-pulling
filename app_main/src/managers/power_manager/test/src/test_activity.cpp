@@ -7,6 +7,7 @@
 
 #include "activity.hpp"
 #include "mock_client.hpp"
+#include "mock_led.hpp"
 #include "mock_motion.hpp"
 
 #include <chrono>
@@ -46,7 +47,9 @@ protected:
 
     StrictMock<motion_svc::MockMotion> motion_;
     StrictMock<ble_svc::MockClient> client_;
-    power_manager::Activity activity_{ motion_, client_, timeouts };
+    NiceMock<led_svc::MockLed> led_;
+    power_manager::Indicator indicator_{ led_ };
+    power_manager::Activity activity_{ motion_, client_, indicator_, timeouts };
 };
 
 TEST_F( ActivityTest, CountsIdleTime )
@@ -60,6 +63,18 @@ TEST_F( ActivityTest, SleepsAfterTheTimeoutWithoutAClient )
     idle_for( 230s );
     EXPECT_CALL( motion_, sleep_until_moved() ).WillOnce( Return( fw::Result<>{} ) );
     EXPECT_TRUE( activity_.check() );
+}
+
+TEST_F( ActivityTest, TurnsTheLedOffToSleepAndBackOnIfItCannot )
+{
+    idle_for( 230s );
+    ON_CALL( led_, color() ).WillByDefault( Return( led_svc::Color::green ) ); // so both writes are needed
+    testing::InSequence const in_order;
+    EXPECT_CALL( led_, show( led_svc::Color::off ) ).WillOnce( Return( fw::Result<>{} ) );
+    EXPECT_CALL( motion_, sleep_until_moved() ).WillOnce( Return( std::unexpected( std::errc::not_supported ) ) );
+    EXPECT_CALL( led_, show( led_svc::Color::blue ) ).WillOnce( Return( fw::Result<>{} ) );
+
+    EXPECT_FALSE( activity_.check() );
 }
 
 TEST_F( ActivityTest, MotionKeepsItAwake )

@@ -26,12 +26,15 @@ struct Event {
         command,           // the client wrote a command (opcode)
         client_connection, // a client connected or disconnected (active)
         measurement_state, // a measurement started or stopped (active)
+        battery,           // a battery reading was published (millivolts)
+        blink_step,        // blink timer
     };
 
     Type type;
     union {
         progressor::Opcode opcode;
         bool active;
+        std::uint32_t millivolts;
     };
 
     [[nodiscard]] static constexpr Event of( Type type ) noexcept
@@ -46,6 +49,14 @@ struct Event {
         Event event{};
         event.type = Type::command;
         event.opcode = opcode;
+        return event;
+    }
+
+    [[nodiscard]] static constexpr Event battery_reading( std::uint32_t millivolts ) noexcept
+    {
+        Event event{};
+        event.type = Type::battery;
+        event.millivolts = millivolts;
         return event;
     }
 

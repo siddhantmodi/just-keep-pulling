@@ -75,8 +75,15 @@ fw::Result<> Activity::check()
 
 fw::Result<> Activity::sleep()
 {
+    // GPIOs keep their state in System OFF: an LED left on would stay on.
+    if( auto ret = indicator_.on_sleep( true ); !ret ) {
+        LOG_WRN( "LED not turned off: %d", fw::err::to_zephyr( ret.error() ) );
+    }
     auto ret = motion_.sleep_until_moved();
     // Still running: sleeping failed, or this board can't (native_sim). Start counting again.
+    if( auto shown = indicator_.on_sleep( false ); !shown ) {
+        LOG_WRN( "LED not restored: %d", fw::err::to_zephyr( shown.error() ) );
+    }
     reset();
     return ret;
 }

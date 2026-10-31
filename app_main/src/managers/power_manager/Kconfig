@@ -2,12 +2,12 @@
 
 config APP_POWER_MANAGER
 	bool "Power manager"
-	depends on ZBUS && APP_PMIC_SVC && APP_BLE_SVC && APP_MOTION_SVC
+	depends on ZBUS && APP_PMIC_SVC && APP_BLE_SVC && APP_MOTION_SVC && APP_LED_SVC
 	help
 	  Thread that reads the battery periodically, publishes it
 	  (channels::battery), and on a low battery warns the client and puts
 	  the PMIC in ship mode. It also tracks inactivity, and after a timeout
-	  sleeps until the device is moved.
+	  sleeps until the device is moved; and it drives the status LED.
 
 if APP_POWER_MANAGER
 

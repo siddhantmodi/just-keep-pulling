@@ -7,6 +7,7 @@
 
 #include "ble_svc.hpp"
 #include "identity_svc.hpp"
+#include "led_svc.hpp"
 #include "load_cell_svc.hpp"
 #include "measurement_manager.hpp"
 #include "motion_svc.hpp"
@@ -38,6 +39,11 @@ int main()
         return 0;
     }
     LOG_INF( "calibration: %ld ug per code", std::lround( load_cell_svc::load_cell().calibration_factor() * 1e6F ) );
+
+    // Without the LED the device still works; it just doesn't show its state.
+    if( auto ret = led_svc::led().init(); !ret ) {
+        LOG_ERR( "LED init failed: %d", fw::err::to_zephyr( ret.error() ) );
+    }
 
     // Without the IMU the device still measures; it then only wakes from idle sleep on a power cycle.
     if( auto ret = motion_svc::motion().init(); !ret ) {
