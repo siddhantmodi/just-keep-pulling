@@ -122,6 +122,8 @@ classDiagram
             data point 7e4e1702: notify
             control point 7e4e1703: write
             advertised_name(DeviceId) Progressor_NNNN
+            Device Information and Battery services
+            battery_level_percent(mV) uint8
         }
     }
 
@@ -361,6 +363,7 @@ classDiagram
     Client ..> progressor_command : publishes
     Client ..> client_connection : publishes
     Client ..> IIdentity : name from id()
+    battery ..> Client : listener, Battery service level
     Ads1220 ..> ads1220_driver
     ads1220_emul ..> ads1220_driver : answers its SPI
 ```

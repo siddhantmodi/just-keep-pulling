@@ -137,7 +137,7 @@ Tests construct a fresh instance per test with mocks: no singleton reset, no lin
 | `identity_svc` | settings (`identity/id`), the random number generator |
 | `load_cell_svc` | `load-cell-adc` (ADS1220), settings (`load_cell/factor`, `load_cell/rate`) |
 | `pmic_svc` | `pmic-charger` and `pmic-regulators` (the nPM1300) |
-| `ble_svc` | `identity_svc::identity()`, channels `progressor_command` and `client_connection` (out) |
+| `ble_svc` | `identity_svc::identity()`, channels `progressor_command` and `client_connection` (out), `battery` (in, for the Battery service) |
 | `measurement_manager` | `load_cell_svc::load_cell()`, `ble_svc::client()`, `identity_svc::identity()`, channels `progressor_command` and `client_connection` (in), `measurement_state` (out), `battery` (read) |
 | `motion_svc` | `motion-sensor` (the IMU and its interrupt pin) |
 | `led_svc` | `status-led-red`, `status-led-green`, `status-led-blue` (GPIO) |
