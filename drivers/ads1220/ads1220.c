@@ -195,6 +195,20 @@ int ads1220_stop( const struct device *dev )
     return send_command( dev, CMD_POWERDOWN );
 }
 
+/*
+ * Microseconds since boot, from the finest clock there is: the 64-bit cycle
+ * counter where the system timer has one (nRF54L: 1 MHz), otherwise the 64-bit
+ * tick count (nRF52: 32768 Hz, the same rate as its cycles).
+ */
+static uint64_t now_us( void )
+{
+#if defined( CONFIG_TIMER_HAS_64BIT_CYCLE_COUNTER )
+    return k_cyc_to_us_floor64( k_cycle_get_64() );
+#else
+    return k_ticks_to_us_floor64( (uint64_t)k_uptime_ticks() );
+#endif
+}
+
 static void drdy_handler( const struct device *port, struct gpio_callback *cb, uint32_t pins )
 {
     struct ads1220_data *data = CONTAINER_OF( cb, struct ads1220_data, drdy_cb );
@@ -207,7 +221,7 @@ static void drdy_handler( const struct device *port, struct gpio_callback *cb, u
         if( k_sem_count_get( &data->drdy_sem ) > 0 ) {
             data->lost++; /* the previous conversion was never read */
         }
-        data->ready_us = k_cyc_to_us_floor64( k_cycle_get_64() );
+        data->ready_us = now_us();
     }
     k_sem_give( &data->drdy_sem );
 }
