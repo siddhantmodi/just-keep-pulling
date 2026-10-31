@@ -11,31 +11,39 @@
 
 #pragma once
 
+#include "progressor.hpp"
+
 #include <zephyr/zbus/zbus.h>
 
 #include <fw/channel_ref.hpp>
+#include <hal/battery_charger.hpp>
 
 namespace channels
 {
 
-/** @brief Ask for the LED to be turned on or off (e.g. from a BLE write). */
-struct LedRequest {
-    bool on;
+/** @brief Whether a client (e.g. the Tindeq app) is connected over Bluetooth. */
+struct ClientConnection {
+    bool connected;
 };
 
-/** @brief The LED state last applied by the app manager. */
-struct LedState {
-    bool on;
+/** @brief Whether a measurement is running (the load cell is sampling for the client). */
+struct MeasurementState {
+    bool measuring;
 };
 
 } // namespace channels
 
-ZBUS_CHAN_DECLARE( led_request_chan, led_state_chan );
+ZBUS_CHAN_DECLARE( progressor_command_chan, client_connection_chan, measurement_state_chan, battery_chan );
 
 namespace channels
 {
 
-inline constexpr fw::ChannelRef<LedRequest> led_request{ led_request_chan };
-inline constexpr fw::ChannelRef<LedState> led_state{ led_state_chan };
+/** @brief Commands the client wrote to the Progressor control point, decoded. */
+inline constexpr fw::ChannelRef<progressor::Command> progressor_command{ progressor_command_chan };
+inline constexpr fw::ChannelRef<ClientConnection> client_connection{ client_connection_chan };
+/** @brief Published by the measurement manager when a measurement starts or stops. */
+inline constexpr fw::ChannelRef<MeasurementState> measurement_state{ measurement_state_chan };
+/** @brief The latest battery reading, published by the power manager at boot and then periodically. */
+inline constexpr fw::ChannelRef<hal::BatteryStatus> battery{ battery_chan };
 
 } // namespace channels

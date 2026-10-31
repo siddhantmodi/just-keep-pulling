@@ -5,6 +5,7 @@ config FW_CPP
 	depends on CPP
 	default y
 	help
-	  Header-only C++23 helpers under <fw/...>: the fw::Result error
-	  model and Zephyr error-code conversions, and fw::ChannelRef (typed
-	  zbus channels, needs CONFIG_ZBUS).
+	  C++23 helpers under <fw/...>: the fw::Result error model and Zephyr
+	  error-code conversions, fw::ChannelRef (typed zbus channels, needs
+	  CONFIG_ZBUS), fw::QueueRef, fw::ScopedLock and fw::settings (typed
+	  load/save, needs CONFIG_SETTINGS).

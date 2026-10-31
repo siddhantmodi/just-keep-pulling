@@ -1,0 +1,28 @@
+# SPDX-License-Identifier: Apache-2.0
+
+config JKP_ADS1220
+	bool "ADS1220 load-cell ADC"
+	default y
+	depends on DT_HAS_JKP_ADS1220_ENABLED
+	select SPI
+	select GPIO
+	help
+	  Continuous-conversion driver for the TI ADS1220 as a ratiometric
+	  load-cell front end (<jkp/drivers/ads1220.h>).
+
+config JKP_ADS1220_INIT_PRIORITY
+	int "ADS1220 init priority"
+	default 80
+	depends on JKP_ADS1220
+	help
+	  Must be after the SPI and GPIO drivers (by default 70 and 40).
+
+config JKP_ADS1220_EMUL
+	bool "ADS1220 emulator"
+	default y
+	depends on JKP_ADS1220 && EMUL && SPI_EMUL
+	select GPIO_EMUL
+	help
+	  Emulates the ADS1220 on an SPI emulator bus (native_sim): conversions at
+	  the configured rate, signalled on an emulated /DRDY pin. Tests set the
+	  samples with <jkp/drivers/ads1220_emul.h>.

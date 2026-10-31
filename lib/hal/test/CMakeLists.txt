@@ -10,4 +10,7 @@ target_compile_options(app PRIVATE -Werror)
 target_sources(app PRIVATE
     src/test_gpio_output.cpp
     src/test_sensor_temperature.cpp
+    src/test_ads1220.cpp
+    src/test_npm13xx.cpp
+    src/test_sensor_motion.cpp
 )

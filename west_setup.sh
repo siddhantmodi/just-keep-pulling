@@ -15,7 +15,14 @@ else
     echo ".west directory already exists. Skipping initialization."
 fi
 
+# Patches to west projects (zephyr/patches.yml): revert them before updating,
+# and re-apply after, so this script can run again on a patched workspace.
+# ("west patch" comes with Zephyr, so a fresh workspace has nothing to revert.)
+if [ -d "${TOPDIR}/deps/zephyr" ]; then
+    west patch clean
+fi
 west update --narrow -o=--depth=1
+west patch apply
 west zephyr-export
 west packages pip --install --ignore-venv-check
 

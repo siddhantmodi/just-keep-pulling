@@ -2,13 +2,11 @@
 
 config APP_LED_SVC
 	bool "LED service"
-	depends on GPIO && FW_HAL
-	depends on $(dt_alias_enabled,led0)
+	depends on GPIO
 	help
-	  Drives the board's led0 alias on/off.
+	  The RGB status LED, as three GPIO-driven LEDs.
 
-# Outside "if APP_LED_SVC" so the unit test (which builds the Led class
-# without the production instance) gets the log level too.
+# Outside "if APP_LED_SVC" so the unit test gets the log level too.
 module = APP_LED_SVC
 module-str = led_svc
 source "subsys/logging/Kconfig.template.log_config"

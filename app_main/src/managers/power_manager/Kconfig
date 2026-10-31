@@ -1,0 +1,49 @@
+# SPDX-License-Identifier: Apache-2.0
+
+config APP_POWER_MANAGER
+	bool "Power manager"
+	depends on ZBUS && APP_PMIC_SVC && APP_BLE_SVC && APP_MOTION_SVC && APP_LED_SVC
+	help
+	  Thread that reads the battery periodically, publishes it
+	  (channels::battery), and on a low battery warns the client and puts
+	  the PMIC in ship mode. It also tracks inactivity, and after a timeout
+	  sleeps until the device is moved; and it drives the status LED.
+
+if APP_POWER_MANAGER
+
+config APP_POWER_MANAGER_STACK_SIZE
+	int "Power manager thread stack size"
+	default 2048
+
+config APP_POWER_MANAGER_PRIORITY
+	int "Power manager thread priority"
+	default 7
+	help
+	  Below the measurement manager: battery checks can wait for sampling.
+
+config APP_POWER_MANAGER_IDLE_TIMEOUT_S
+	int "Idle time before sleeping, with no client (s)"
+	default 240
+	help
+	  Without commands, connections, measurements or motion. Crimpdeq's: 4 min.
+
+config APP_POWER_MANAGER_CONNECTED_IDLE_TIMEOUT_S
+	int "Idle time before sleeping, with a client connected (s)"
+	default 1800
+	help
+	  Long enough for rests between sets, while a client left connected
+	  can't keep the device awake for ever. Crimpdeq's: 30 min.
+
+config APP_POWER_MANAGER_QUEUE_DEPTH
+	int "Power manager event queue depth"
+	default 8
+	help
+	  Events waiting for the manager thread. When full, new events are
+	  dropped (and counted) rather than blocking the publisher.
+
+endif # APP_POWER_MANAGER
+
+# Outside "if APP_POWER_MANAGER" so the unit test gets the log level too.
+module = APP_POWER_MANAGER
+module-str = power_manager
+source "subsys/logging/Kconfig.template.log_config"

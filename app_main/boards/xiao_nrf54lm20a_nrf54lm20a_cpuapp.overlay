@@ -1,0 +1,136 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+
+#include <zephyr/dt-bindings/regulator/npm13xx.h>
+
+/*
+ * The XIAO's nPM1300 PMIC, as Seeed's current board files define it
+ * (github.com/Seeed-Studio/platform-seeedboards, zephyr/nrf/boards/seeed/
+ * xiao_nrf54lm20a). The copy of the board in this NCS version is older: wrong
+ * PMIC I2C pins (P1.15/P1.16), LDO1 at 1.8 V and no BUCK2. Its bit-banged I2C
+ * is kept, as Seeed's.
+ */
+/ {
+	aliases {
+		pmic-charger = &pmic_charger;
+		pmic-regulators = &pmic_regulators;
+		motion-sensor = &lsm6ds3tr_c;
+		status-led-red = &red_led;
+		status-led-green = &green_led;
+		status-led-blue = &blue_led;
+	};
+};
+
+/*
+ * The RGB LED as Seeed's current board files have it: active low, red on
+ * P1.22 and blue on P1.23 (NCS's copy has them active high and swapped).
+ * The PWM LED nodes are not used here and are left as they are.
+ */
+&red_led {
+	gpios = <&gpio1 22 GPIO_ACTIVE_LOW>;
+};
+
+&green_led {
+	gpios = <&gpio1 24 GPIO_ACTIVE_LOW>;
+};
+
+&blue_led {
+	gpios = <&gpio1 23 GPIO_ACTIVE_LOW>;
+};
+
+/*
+ * The LSM6DS3TR-C IMU (i2c30, INT1 on P0.06) is powered by the PMIC's LDO1,
+ * which starts after sensor init: the app initializes it later, as Seeed's IMU
+ * sample does. INT1 also wakes the SoC from System OFF.
+ */
+&lsm6ds3tr_c {
+	zephyr,deferred-init;
+};
+
+&pmic_i2c {
+	sda-gpios = <&gpio1 18 GPIO_ACTIVE_HIGH>;
+	scl-gpios = <&gpio1 17 GPIO_ACTIVE_HIGH>;
+};
+
+&pmic_charger {
+	/* 2000 mAh LiPo: 500 mA (0.25C) to 4.2 V, within the 500 mA USB budget. */
+	term-microvolt = <4200000>;
+	current-microamp = <500000>;
+	/* Seeed's 10 kOhm NTC (beta 3380). To confirm on the schematic: with no
+	 * thermistor fitted, the charger would see an open NTC and not charge. */
+	thermistor-ohms = <10000>;
+	thermistor-beta = <3380>;
+};
+
+&pmic {
+	/* Labelled for ship mode, which goes through the regulators' parent device. */
+	pmic_regulators: regulators {
+		/* VSYS_3V3: powers the nRF54LM20A. */
+		vsys_3v3: BUCK2 {
+			regulator-always-on;
+			regulator-min-microvolt = <3300000>;
+			regulator-max-microvolt = <3300000>;
+		};
+
+		/* Powers the IMU and the PDM microphone. */
+		LDO1 {
+			regulator-init-microvolt = <3300000>;
+			regulator-min-microvolt = <3300000>;
+			regulator-max-microvolt = <3300000>;
+			regulator-initial-mode = <NPM13XX_LDSW_MODE_LDO>;
+			regulator-allowed-modes = <NPM13XX_LDSW_MODE_LDO>;
+			regulator-boot-on;
+		};
+	};
+};
+
+/*
+ * ADS1220 load-cell ADC on the XIAO SPI (SCK P1.04, MOSI P1.06, MISO P1.05),
+ * /CS on P1.00 (D0) and /DRDY on P1.31 (D1). Ratiometric: REFP0/REFN0 across
+ * the bridge excitation; bridge signal on AIN1/AIN2; bridge returned through
+ * AIN3/REFN1 so the low-side switch cuts it while powered down.
+ */
+/ {
+	aliases {
+		load-cell-adc = &load_cell_adc;
+	};
+};
+
+&spi23 {
+	cs-gpios = <&gpio1 0 GPIO_ACTIVE_LOW>;
+
+	load_cell_adc: ads1220@0 {
+		compatible = "jkp,ads1220";
+		reg = <0>;
+		spi-max-frequency = <2000000>;
+		drdy-gpios = <&gpio1 31 GPIO_ACTIVE_LOW>;
+		low-side-power-switch;
+	};
+};
+
+/*
+ * Nordic's SoftDevice Controller, as on Nordic's own nRF54LM20 DK. Seeed's
+ * board picks Zephyr's experimental software link layer, which conflicts with it.
+ * The SoftDevice Controller's MPSL also needs the clock sources the DK enables
+ * and Seeed's board leaves disabled (the XIAO has both crystals).
+ */
+/ {
+	chosen {
+		zephyr,bt-hci = &bt_hci_sdc;
+	};
+};
+
+&bt_hci_controller {
+	status = "disabled";
+};
+
+&xo {
+	status = "okay";
+};
+
+&lfclk {
+	status = "okay";
+};
+
+&xo24m {
+	status = "okay";
+};

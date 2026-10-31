@@ -6,3 +6,50 @@
 		millicelsius = <21500>;
 	};
 };
+
+/* An emulated ADS1220 on native_sim's SPI emulator bus, /DRDY on an emulated GPIO. */
+&spi0 {
+	load_cell_adc: ads1220@0 {
+		compatible = "jkp,ads1220";
+		reg = <0>;
+		spi-max-frequency = <2000000>;
+		drdy-gpios = <&gpio0 10 GPIO_ACTIVE_LOW>;
+		low-side-power-switch;
+	};
+};
+
+/*
+ * An emulated nPM1300 on native_sim's I2C emulator bus: Zephyr's own MFD,
+ * charger and regulator drivers run against the repo's register emulator.
+ */
+&i2c0 {
+	pmic: npm1300@6b {
+		compatible = "nordic,npm1300";
+		reg = <0x6b>;
+
+		pmic_charger: charger {
+			compatible = "nordic,npm1300-charger";
+			term-microvolt = <4200000>;
+			current-microamp = <500000>;
+			dischg-limit-microamp = <1000000>;
+			vbus-limit-microamp = <500000>;
+			thermistor-ohms = <10000>;
+			thermistor-beta = <3380>;
+			charging-enable;
+		};
+
+		pmic_regulators: regulators {
+			compatible = "nordic,npm1300-regulator";
+		};
+	};
+
+	/* Zephyr's LSM6DSL driver (patched with a motion trigger) against its emulator.
+	 * Deferred, as on the XIAO, where the PMIC powers the sensor after sensor init.
+	 */
+	imu: lsm6dsl@6a {
+		compatible = "st,lsm6dsl";
+		reg = <0x6a>;
+		irq-gpios = <&gpio0 11 GPIO_ACTIVE_HIGH>;
+		zephyr,deferred-init;
+	};
+};

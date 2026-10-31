@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: Apache-2.0
+
+config APP_IDENTITY_SVC
+	bool "Identity service"
+	depends on SETTINGS
+	help
+	  The device's unique 6-byte ID: generated randomly on first boot and
+	  saved in settings.
+
+# Outside "if APP_IDENTITY_SVC" so the unit test gets the log level too.
+module = APP_IDENTITY_SVC
+module-str = identity_svc
+source "subsys/logging/Kconfig.template.log_config"

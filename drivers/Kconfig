@@ -2,6 +2,9 @@
 
 menu "just-keep-pulling drivers"
 
+rsource "ads1220/Kconfig"
+rsource "npm1300_emul/Kconfig"
+
 if SENSOR
 rsource "sensor/Kconfig"
 endif

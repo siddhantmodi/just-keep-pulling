@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: Apache-2.0
+
+config APP_DEBUG_SHELL
+	bool "Debug shell commands"
+	default y
+	depends on SHELL && ZBUS && APP_IDENTITY_SVC && APP_LOAD_CELL_SVC
+	help
+	  "jkp" shell commands to show and change the device ID and the sample
+	  rate, and to show the battery. Debug builds only: the shell is
+	  enabled by debug.conf.

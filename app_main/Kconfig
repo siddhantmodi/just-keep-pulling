@@ -9,11 +9,17 @@ module-str = app_main
 source "subsys/logging/Kconfig.template.log_config"
 
 menu "Services"
-rsource "src/services/led_svc/Kconfig"
-rsource "src/services/temp_svc/Kconfig"
+rsource "src/services/identity_svc/Kconfig"
+rsource "src/services/load_cell_svc/Kconfig"
 rsource "src/services/ble_svc/Kconfig"
+rsource "src/services/pmic_svc/Kconfig"
+rsource "src/services/motion_svc/Kconfig"
+rsource "src/services/led_svc/Kconfig"
 endmenu
 
 menu "Managers"
-rsource "src/managers/app_manager/Kconfig"
+rsource "src/managers/measurement_manager/Kconfig"
+rsource "src/managers/power_manager/Kconfig"
 endmenu
+
+rsource "src/debug_shell/Kconfig"

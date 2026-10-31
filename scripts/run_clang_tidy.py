@@ -47,6 +47,9 @@ def build_with_clang(app_dir: Path, board: str, build_dir: Path) -> None:
         "west", "build", "--no-sysbuild", "-p", "always", "-b", board, "-d", str(build_dir), str(app_dir),
         "--", "-DTOOLCHAIN_VARIANT_COMPILER=llvm", f"-DLLVM_TOOLCHAIN_PATH={llvm}",
     ]
+    # A debug build includes everything a release build does, plus debug-only code (e.g. shell commands).
+    if (app_dir / "debug.conf").exists():
+        cmd.append("-DEXTRA_CONF_FILE=debug.conf")
     if subprocess.run(cmd, cwd=REPO_ROOT).returncode != 0:
         sys.exit("error: native_sim clang build failed.")
 

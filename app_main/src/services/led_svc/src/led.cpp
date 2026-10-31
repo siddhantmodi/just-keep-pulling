@@ -9,8 +9,8 @@
 
 #include <zephyr/logging/log.h>
 
-#include <expected>
-#include <system_error>
+#include <initializer_list>
+#include <utility>
 
 LOG_MODULE_REGISTER( led_svc, CONFIG_APP_LED_SVC_LOG_LEVEL );
 
@@ -19,32 +19,32 @@ namespace led_svc
 
 fw::Result<> Led::init()
 {
-    if( auto ret = output_.init( false ); !ret ) {
-        LOG_ERR( "init failed: %d", fw::err::to_zephyr( ret.error() ) );
-        return ret;
+    for( hal::IDigitalOutput *output : { &red_, &green_, &blue_ } ) {
+        if( auto ret = output->init( false ); !ret ) {
+            LOG_ERR( "LED not ready: %d", fw::err::to_zephyr( ret.error() ) );
+            return ret;
+        }
     }
-    on_ = false;
-    initialized_ = true;
+    color_ = Color::off;
     return {};
 }
 
-fw::Result<> Led::set( bool on )
+fw::Result<> Led::show( Color color )
 {
-    if( !initialized_ ) {
-        return std::unexpected( std::errc::operation_not_permitted );
+    // All three are set, so a failure leaves at worst a different single color, never a mix.
+    fw::Result<> result{};
+    for( auto [output, own] : { std::pair{ &red_, Color::red }, std::pair{ &green_, Color::green }, std::pair{ &blue_, Color::blue } } ) {
+        if( auto ret = output->set( color == own ); !ret && result ) {
+            result = ret;
+        }
     }
-    if( auto ret = output_.set( on ); !ret ) {
-        LOG_ERR( "set(%d) failed: %d", on, fw::err::to_zephyr( ret.error() ) );
-        return ret;
-    }
-    on_ = on;
-    LOG_INF( "LED %s", on ? "on" : "off" );
-    return {};
+    color_ = color;
+    return result;
 }
 
-bool Led::is_on() const
+Color Led::color() const
 {
-    return on_;
+    return color_;
 }
 
 } // namespace led_svc
