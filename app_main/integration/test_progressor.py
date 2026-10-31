@@ -2,7 +2,8 @@
 """app_main as a Tindeq Progressor, end to end: a Bumble central does what the Tindeq app does.
 
 The emulated ADS1220 reads a constant 0 codes, which the boot-time tare zeroes,
-so streamed weights are 0 kg; the maths is unit tested.
+so streamed weights are 0 kg; the maths is unit tested. The emulated nPM1300's
+battery reads 3750 mV, so the low-battery power-off is unit tested too.
 """
 
 from __future__ import annotations
@@ -35,6 +36,9 @@ GET_PROGRESSOR_ID = b"\x70"
 
 COMMAND_RESPONSE = 0x00
 WEIGHT_MEASUREMENT = 0x01
+
+# The emulated nPM1300's battery (app_main/boards/native_sim.overlay), as the power manager last read it.
+EMULATED_BATTERY_MV = 3750
 
 # The ATT MTU iOS negotiates, which carries 30 samples per notification.
 CLIENT_MTU = 247
@@ -184,7 +188,7 @@ async def test_answers_progressor_id_least_significant_byte_first(client, device
 @pytest.mark.asyncio
 async def test_answers_battery_voltage(client):
     millivolts = struct.unpack("<I", await client.command_response(SAMPLE_BATTERY))[0]
-    assert millivolts == 4000  # placeholder until the PMIC's fuel gauge is read
+    assert millivolts == EMULATED_BATTERY_MV
 
 
 @pytest.mark.asyncio

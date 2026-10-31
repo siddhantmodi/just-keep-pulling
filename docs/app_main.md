@@ -2,7 +2,7 @@
 
 How `app_main`'s interfaces, classes, modules and drivers fit together, and what each offers. Keep this diagram in step with the code: a change to an interface or a new component updates it in the same commit.
 
-Conventions: `<<interface>>` classes are the seams that tests mock; a solid arrow is a reference held by an object, a dashed arrow is a call or use. Methods return `fw::Result` (`Result~T~` here) unless shown otherwise. Mocks (`hal::mocks::MockLoadCellAdc`, `load_cell_svc::MockLoadCell`, `ble_svc::MockClient`) implement each interface for unit tests and are left out to keep the diagram readable.
+Conventions: `<<interface>>` classes are the seams that tests mock; a solid arrow is a reference held by an object, a dashed arrow is a call or use. Methods return `fw::Result` (`Result~T~` here) unless shown otherwise. Mocks (`hal::mocks::MockLoadCellAdc`, `MockBatteryCharger`, `MockPowerOff`, `load_cell_svc::MockLoadCell`, `ble_svc::MockClient`, `pmic_svc::MockPmic`) implement each interface for unit tests and are left out to keep the diagram readable.
 
 ```mermaid
 classDiagram
@@ -29,10 +29,20 @@ classDiagram
         }
     }
 
+    namespace power_manager {
+        class Power {
+            <<manager thread>>
+            +handle(Event) Result
+            +next_check() milliseconds
+            is_low(BatteryStatus) bool
+        }
+    }
+
     class debug_shell {
         <<debug builds only>>
         jkp id [set hex]
         jkp rate [set SPS]
+        jkp battery
     }
 
     namespace identity_svc {
@@ -98,6 +108,16 @@ classDiagram
         }
     }
 
+    namespace pmic_svc {
+        class IPmic {
+            <<interface>>
+            +init() Result
+            +read_battery() Result~BatteryStatus~
+            +ship_mode() Result
+        }
+        class Pmic
+    }
+
     namespace channels {
         class progressor_command {
             <<zbus>>
@@ -106,6 +126,10 @@ classDiagram
         class client_connection {
             <<zbus>>
             bool connected
+        }
+        class battery {
+            <<zbus>>
+            hal::BatteryStatus
         }
     }
 
@@ -156,6 +180,29 @@ classDiagram
             <<hal::zephyr>>
             -device* dev_
         }
+        class IBatteryCharger {
+            <<interface>>
+            +init() Result
+            +read() Result~BatteryStatus~
+        }
+        class BatteryStatus {
+            +uint32 millivolts
+            +bool charging
+            +bool external_power
+        }
+        class IPowerOff {
+            <<interface>>
+            +init() Result
+            +power_off() Result
+        }
+        class Npm13xxCharger {
+            <<hal::zephyr>>
+            Zephyr nPM13xx charger sensor
+        }
+        class RegulatorShipMode {
+            <<hal::zephyr>>
+            regulator_parent_ship_mode()
+        }
     }
 
     namespace drivers {
@@ -172,6 +219,13 @@ classDiagram
             ads1220_emul_set_raw(raw)
             ads1220_emul_set_source(fn)
         }
+        class npm1300_emul {
+            <<native_sim only>>
+            nPM1300 registers on the I2C emulator bus
+            npm1300_emul_set_battery_mv(mV)
+            npm1300_emul_set_charging(bool)
+            npm1300_emul_set_vbus(bool)
+        }
     }
 
     class fw_settings {
@@ -186,14 +240,20 @@ classDiagram
     ILoadCell <|.. LoadCell
     IClient <|.. Client
     ILoadCellAdc <|.. Ads1220
+    IPmic <|.. Pmic
+    IBatteryCharger <|.. Npm13xxCharger
+    IPowerOff <|.. RegulatorShipMode
 
     main ..> IIdentity : identity()
     main ..> ILoadCell : load_cell()
     main ..> fw_settings : init
     main ..> Client : ble_svc init()
     main ..> Measurement : measurement_manager start()
+    main ..> IPmic : pmic() init
+    main ..> Power : power_manager start()
     debug_shell ..> IIdentity
     debug_shell ..> ILoadCell : rate only
+    debug_shell ..> battery : reads
 
     Identity ..> fw_settings : "identity/id"
     Identity ..> DeviceId
@@ -207,6 +267,14 @@ classDiagram
     Measurement --> IClient : client_
     Measurement ..> progressor : encode responses and samples
     Measurement ..> Event
+    Measurement ..> battery : reads for 0x6F
+    Power --> IPmic : pmic_
+    Power --> IClient : low-power warning
+    Power ..> battery : publishes
+    Pmic --> IBatteryCharger : charger_
+    Pmic --> IPowerOff : power_off_
+    IBatteryCharger ..> BatteryStatus
+    npm1300_emul ..> Npm13xxCharger : answers Zephyr's drivers over I2C
     progressor_command ..> Event : listener, queue
     client_connection ..> Event : listener, queue
     Client ..> progressor : decode_command
@@ -219,6 +287,8 @@ classDiagram
 
 The measurement manager's thread takes `Event`s off its queue (fed by a zbus listener on both channels) and, while measuring, calls `sample()` between them: each `ForceSample` becomes a `progressor::Sample` with its time since the measurement started, and batches of up to 50 ms (at most what one notification carries) go out through `ble_svc::client()`. It is the only caller of `ILoadCell`'s single-threaded operations; the debug shell only uses the thread-safe sample rate.
 
+The power manager's thread reads the battery every 30 s (its timer posts an `Event`) and publishes it on `channels::battery`, which the measurement manager answers 0x6F from. A reading at or below 3.3 V with no charging or USB power is confirmed 1 s later; then the client gets the 0x04 low-power warning and, 0.5 s later, the PMIC enters ship mode. It is the only caller of `IPmic`.
+
 ## Production wiring
 
 Each component's production file binds the concrete types (see `docs/architecture.md`, Component pattern):
@@ -227,5 +297,7 @@ Each component's production file binds the concrete types (see `docs/architectur
 |---|---|---|
 | `identity_svc::identity()` | `Identity` | settings key `identity/id` |
 | `measurement_manager::start()` | `Measurement` in `measurement_manager.cpp`, built on first use | `load_cell()`, `client()`, and the device ID as at boot; thread priority 2 |
+| `power_manager::start()` | `Power` in `power_manager.cpp`, built on first use | `pmic()`, `client()`; thread priority 7 |
+| `pmic_svc::pmic()` | `Pmic` on `hal::zephyr::Npm13xxCharger` and `RegulatorShipMode` | devicetree aliases `pmic-charger` and `pmic-regulators`: the XIAO's nPM1300 (bit-banged I2C on P1.18/P1.17), or the emulated chip on native_sim |
 | `ble_svc::client()` | `Client` in `ble_svc.cpp` | Bluetooth: the Progressor GATT service, advertising as `Progressor_NNNN` (NNNN from the device ID) |
 | `load_cell_svc::load_cell()` | `LoadCell` on `hal::zephyr::Ads1220` | devicetree alias `load-cell-adc`: the ADS1220 on the XIAO's SPI (`/CS` P1.00, `/DRDY` P1.31), or the emulated chip on native_sim |

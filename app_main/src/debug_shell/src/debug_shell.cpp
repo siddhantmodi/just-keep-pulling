@@ -1,15 +1,17 @@
 /**
  * @file debug_shell.cpp
- * @brief Debug-build shell commands: jkp id [set <hex>], jkp rate [set <SPS>].
+ * @brief Debug-build shell commands: jkp id [set <hex>], jkp rate [set <SPS>], jkp battery.
  *
  * Built only when debug.conf enables the shell. Commands run in the shell
  * thread, so they only use the services' thread-safe calls: changing the ID
  * (picked up on the next boot) and the configured sample rate (picked up on
- * the next measurement).
+ * the next measurement). The battery comes from the power manager's latest
+ * reading on zbus.
  *
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include "channels.hpp"
 #include "identity_svc.hpp"
 #include "load_cell_svc.hpp"
 
@@ -82,6 +84,18 @@ int cmd_rate_set( const shell *sh, size_t /*argc*/, char **argv )
     return 0;
 }
 
+int cmd_battery( const shell *sh, size_t /*argc*/, char ** /*argv*/ )
+{
+    auto battery = channels::battery.read( K_MSEC( 100 ) );
+    if( !battery ) {
+        shell_error( sh, "no reading: %d", fw::err::to_zephyr( battery.error() ) );
+        return fw::err::to_zephyr( battery.error() );
+    }
+    shell_print( sh, "%u mV, %s, USB %s", static_cast<unsigned>( battery->millivolts ), battery->charging ? "charging" : "not charging",
+                 battery->external_power ? "present" : "absent" );
+    return 0;
+}
+
 } // namespace
 
 // The Zephyr shell macros declare C arrays and compare the subcommand and handler with NULL,
@@ -92,6 +106,7 @@ SHELL_STATIC_SUBCMD_SET_CREATE( jkp_id_cmds, SHELL_CMD_ARG( set, NULL, "Set the 
 SHELL_STATIC_SUBCMD_SET_CREATE( jkp_rate_cmds, SHELL_CMD_ARG( set, NULL, "Set the sample rate: jkp rate set <SPS>", cmd_rate_set, 2, 0 ),
                                 SHELL_SUBCMD_SET_END );
 SHELL_STATIC_SUBCMD_SET_CREATE( jkp_cmds, SHELL_CMD( id, &jkp_id_cmds, "Show the device ID", cmd_id ),
-                                SHELL_CMD( rate, &jkp_rate_cmds, "Show the sample rate", cmd_rate ), SHELL_SUBCMD_SET_END );
+                                SHELL_CMD( rate, &jkp_rate_cmds, "Show the sample rate", cmd_rate ),
+                                SHELL_CMD( battery, NULL, "Show the latest battery reading (every 30 s)", cmd_battery ), SHELL_SUBCMD_SET_END );
 SHELL_CMD_REGISTER( jkp, &jkp_cmds, "Dynamometer debug commands", NULL );
 // NOLINTEND(modernize-avoid-c-arrays,modernize-use-nullptr,performance-no-int-to-ptr)

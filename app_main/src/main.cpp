@@ -9,6 +9,8 @@
 #include "identity_svc.hpp"
 #include "load_cell_svc.hpp"
 #include "measurement_manager.hpp"
+#include "pmic_svc.hpp"
+#include "power_manager.hpp"
 
 #include <zephyr/app_version.h>
 #include <zephyr/logging/log.h>
@@ -35,6 +37,13 @@ int main()
         return 0;
     }
     LOG_INF( "calibration: %ld ug per code", std::lround( load_cell_svc::load_cell().calibration_factor() * 1e6F ) );
+
+    // Without the PMIC the device still measures; only battery reports and low-battery power-off are lost.
+    if( auto ret = pmic_svc::pmic().init(); !ret ) {
+        LOG_ERR( "PMIC init failed: %d", fw::err::to_zephyr( ret.error() ) );
+    } else if( auto started = power_manager::start(); !started ) {
+        LOG_ERR( "first battery reading failed: %d", fw::err::to_zephyr( started.error() ) );
+    }
 
     // Before Bluetooth, so the manager observes the first command.
     if( auto ret = measurement_manager::start(); !ret ) {

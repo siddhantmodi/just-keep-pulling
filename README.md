@@ -4,7 +4,7 @@ Zephyr RTOS based firmware for a dynamometer for measuring finger strength for r
 
 Built on the nRF Connect SDK (NCS) for the Seeed XIAO nRF54LM20A, in C++23, with GoogleTest unit tests and Bumble BLE integration tests that run on `native_sim`.
 
-The firmware is `app_main`: a finger-strength dynamometer for the Seeed XIAO nRF54LM20A with an ADS1220 load-cell ADC, compatible with the Tindeq Progressor app (Bluetooth protocol as implemented by [Crimpdeq](https://github.com/crimpdeq)). It advertises as `Progressor_NNNN` and answers the Progressor commands: tare, start/stop measurement (streaming timestamped samples), app version, Progressor ID, battery voltage (a placeholder until the PMIC is read), shutdown, and Crimpdeq's add-calibration-point. Power management, the LED and OTA updates are still to come; see `docs/architecture.md` for the patterns it follows and `docs/app_main.md` for how its parts connect.
+The firmware is `app_main`: a finger-strength dynamometer for the Seeed XIAO nRF54LM20A with an ADS1220 load-cell ADC, compatible with the Tindeq Progressor app (Bluetooth protocol as implemented by [Crimpdeq](https://github.com/crimpdeq)). It advertises as `Progressor_NNNN` and answers the Progressor commands: tare, start/stop measurement (streaming timestamped samples), app version, Progressor ID, battery voltage (from the nPM1300 PMIC), shutdown, and Crimpdeq's add-calibration-point. On a low battery it sends the Progressor low-power warning and puts the PMIC in ship mode. Idle sleep, the LED and OTA updates are still to come; see `docs/architecture.md` for the patterns it follows and `docs/app_main.md` for how its parts connect.
 
 ## Repository layout
 
@@ -21,12 +21,12 @@ include/jkp/          Their headers; dts/bindings/ holds their devicetree bindin
 docs/architecture.md  Design rules, layers, why C++, and when to revisit them
 docs/app_main.md      app_main's class diagram (Mermaid): interfaces, implementations, modules, drivers
 app_main/             The dynamometer firmware (XIAO nRF54LM20A; native_sim for tests)
-  boards/             Devicetree overlays per board (alias load-cell-adc: the ADS1220, or its emulator)
+  boards/             Devicetree overlays per board (aliases load-cell-adc, pmic-charger, pmic-regulators: the real chips or their emulators)
   debug.conf          Debug build variant: adds the shell
   src/main.cpp
   src/channels/       zbus channels: the message contracts shared by every layer
-  src/managers/       Own a thread and an event queue (measurement_manager)
-  src/services/       One subsystem or peripheral each (identity_svc, load_cell_svc, ble_svc)
+  src/managers/       Own a thread and an event queue (measurement_manager, power_manager)
+  src/services/       One subsystem or peripheral each (identity_svc, load_cell_svc, ble_svc, pmic_svc)
   src/modules/        Pure logic, no Zephyr (calibration, progressor)
   src/debug_shell/    "jkp" shell commands, debug builds only
     <component>/      Each component:
@@ -64,7 +64,7 @@ From the workspace topdir (`/home/user/workspace` in the devcontainer):
 west build -b xiao_nrf54lm20a/nrf54lm20a/cpuapp -d build/app_main just-keep-pulling/app_main
 west flash -d build/app_main
 
-# Debug build: adds the shell on the console UART, with "jkp id" and "jkp rate" commands
+# Debug build: adds the shell on the console UART, with "jkp id", "jkp rate" and "jkp battery" commands
 west build -b xiao_nrf54lm20a/nrf54lm20a/cpuapp -d build/app_main-debug just-keep-pulling/app_main -- -DEXTRA_CONF_FILE=debug.conf
 ```
 

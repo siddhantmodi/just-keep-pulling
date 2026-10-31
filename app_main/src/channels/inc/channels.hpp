@@ -16,6 +16,7 @@
 #include <zephyr/zbus/zbus.h>
 
 #include <fw/channel_ref.hpp>
+#include <hal/battery_charger.hpp>
 
 namespace channels
 {
@@ -27,7 +28,7 @@ struct ClientConnection {
 
 } // namespace channels
 
-ZBUS_CHAN_DECLARE( progressor_command_chan, client_connection_chan );
+ZBUS_CHAN_DECLARE( progressor_command_chan, client_connection_chan, battery_chan );
 
 namespace channels
 {
@@ -35,5 +36,7 @@ namespace channels
 /** @brief Commands the client wrote to the Progressor control point, decoded. */
 inline constexpr fw::ChannelRef<progressor::Command> progressor_command{ progressor_command_chan };
 inline constexpr fw::ChannelRef<ClientConnection> client_connection{ client_connection_chan };
+/** @brief The latest battery reading, published by the power manager at boot and then periodically. */
+inline constexpr fw::ChannelRef<hal::BatteryStatus> battery{ battery_chan };
 
 } // namespace channels

@@ -32,9 +32,6 @@ namespace measurement_manager
 /** @brief The version reported to the client: Crimpdeq's, which the Tindeq app accepts. */
 inline constexpr std::string_view app_version = "2.0.4";
 
-/** @brief The battery voltage reported until the PMIC's fuel gauge is read: a charged cell's, so the app shows no warning. */
-inline constexpr std::uint32_t placeholder_battery_mv = 4000;
-
 /** @brief Longest time a batch collects samples, so low rates still update the client often (Crimpdeq's). */
 inline constexpr std::chrono::milliseconds max_batch_duration{ 50 };
 

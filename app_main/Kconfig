@@ -12,10 +12,12 @@ menu "Services"
 rsource "src/services/identity_svc/Kconfig"
 rsource "src/services/load_cell_svc/Kconfig"
 rsource "src/services/ble_svc/Kconfig"
+rsource "src/services/pmic_svc/Kconfig"
 endmenu
 
 menu "Managers"
 rsource "src/managers/measurement_manager/Kconfig"
+rsource "src/managers/power_manager/Kconfig"
 endmenu
 
 rsource "src/debug_shell/Kconfig"

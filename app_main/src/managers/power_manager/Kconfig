@@ -1,0 +1,35 @@
+# SPDX-License-Identifier: Apache-2.0
+
+config APP_POWER_MANAGER
+	bool "Power manager"
+	depends on ZBUS && APP_PMIC_SVC && APP_BLE_SVC
+	help
+	  Thread that reads the battery periodically, publishes it
+	  (channels::battery), and on a low battery warns the client and puts
+	  the PMIC in ship mode.
+
+if APP_POWER_MANAGER
+
+config APP_POWER_MANAGER_STACK_SIZE
+	int "Power manager thread stack size"
+	default 2048
+
+config APP_POWER_MANAGER_PRIORITY
+	int "Power manager thread priority"
+	default 7
+	help
+	  Below the measurement manager: battery checks can wait for sampling.
+
+config APP_POWER_MANAGER_QUEUE_DEPTH
+	int "Power manager event queue depth"
+	default 4
+	help
+	  Events waiting for the manager thread. When full, new events are
+	  dropped (and counted) rather than blocking the publisher.
+
+endif # APP_POWER_MANAGER
+
+# Outside "if APP_POWER_MANAGER" so the unit test gets the log level too.
+module = APP_POWER_MANAGER
+module-str = power_manager
+source "subsys/logging/Kconfig.template.log_config"

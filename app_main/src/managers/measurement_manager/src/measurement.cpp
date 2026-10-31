@@ -93,7 +93,14 @@ fw::Result<> Measurement::on_command( const progressor::Command &command )
         }
         return client_.disconnect();
     case Opcode::sample_battery:
-        return reply( progressor::encode_battery_voltage( placeholder_battery_mv ) );
+    {
+        // The power manager's latest reading: measuring here would compete with it for the PMIC.
+        auto battery = channels::battery.read();
+        if( !battery ) {
+            return std::unexpected( battery.error() );
+        }
+        return reply( progressor::encode_battery_voltage( battery->millivolts ) );
+    }
     case Opcode::get_progressor_id:
         return reply( progressor::encode_progressor_id( id_ ) );
     }

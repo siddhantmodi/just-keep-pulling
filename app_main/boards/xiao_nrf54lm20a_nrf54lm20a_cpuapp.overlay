@@ -9,6 +9,13 @@
  * PMIC I2C pins (P1.15/P1.16), LDO1 at 1.8 V and no BUCK2. Its bit-banged I2C
  * is kept, as Seeed's.
  */
+/ {
+	aliases {
+		pmic-charger = &pmic_charger;
+		pmic-regulators = &pmic_regulators;
+	};
+};
+
 &pmic_i2c {
 	sda-gpios = <&gpio1 18 GPIO_ACTIVE_HIGH>;
 	scl-gpios = <&gpio1 17 GPIO_ACTIVE_HIGH>;

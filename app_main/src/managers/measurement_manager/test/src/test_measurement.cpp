@@ -302,11 +302,13 @@ TEST_F( MeasurementTest, AnswersTheProgressorIdLeastSignificantByteFirst )
     EXPECT_EQ( sent_[0], ( std::vector<std::uint8_t>{ 0x00, 6, 0xD5, 0x1B, 0x01, 0x17, 0x4E, 0x7E } ) );
 }
 
-TEST_F( MeasurementTest, AnswersTheBatteryVoltage )
+TEST_F( MeasurementTest, AnswersTheLatestBatteryReading )
 {
+    ASSERT_TRUE( channels::battery.publish( { .millivolts = 3812, .charging = false, .external_power = false } ) );
+
     ASSERT_TRUE( measurement_.handle( command( Opcode::sample_battery ) ) );
     ASSERT_EQ( sent_.size(), 1U );
-    EXPECT_EQ( sent_[0], ( std::vector<std::uint8_t>{ 0x00, 4, 0xA0, 0x0F, 0x00, 0x00 } ) ); // 4000 mV
+    EXPECT_EQ( sent_[0], ( std::vector<std::uint8_t>{ 0x00, 4, 0xE4, 0x0E, 0x00, 0x00 } ) ); // 3812 mV
 }
 
 TEST_F( MeasurementTest, ShutdownStopsMeasuringAndDisconnects )

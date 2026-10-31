@@ -136,9 +136,11 @@ Tests construct a fresh instance per test with mocks: no singleton reset, no lin
 |---|---|
 | `identity_svc` | settings (`identity/id`), the random number generator |
 | `load_cell_svc` | `load-cell-adc` (ADS1220), settings (`load_cell/factor`, `load_cell/rate`) |
+| `pmic_svc` | `pmic-charger` and `pmic-regulators` (the nPM1300) |
 | `ble_svc` | `identity_svc::identity()`, channels `progressor_command` and `client_connection` (out) |
-| `measurement_manager` | `load_cell_svc::load_cell()`, `ble_svc::client()`, `identity_svc::identity()`, channels `progressor_command` and `client_connection` (in) |
-| `debug_shell` | `identity_svc::identity()`, `load_cell_svc::load_cell()` (the thread-safe sample rate only) |
+| `measurement_manager` | `load_cell_svc::load_cell()`, `ble_svc::client()`, `identity_svc::identity()`, channels `progressor_command` and `client_connection` (in), `battery` (read) |
+| `power_manager` | `pmic_svc::pmic()`, `ble_svc::client()`, channel `battery` (out) |
+| `debug_shell` | `identity_svc::identity()`, `load_cell_svc::load_cell()` (the thread-safe sample rate only), channel `battery` (read) |
 
 ## Build variants
 
