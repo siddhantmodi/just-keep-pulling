@@ -16,11 +16,11 @@
 namespace
 {
 
-using jkp_svc::decode_calibration_kg;
-using jkp_svc::decode_reset_calibration;
-using jkp_svc::decode_sample_rate;
-using jkp_svc::encode_calibration;
-using jkp_svc::encode_sample_rate;
+using ble_svc::jkp::decode_calibration_kg;
+using ble_svc::jkp::decode_reset_calibration;
+using ble_svc::jkp::decode_sample_rate;
+using ble_svc::jkp::encode_calibration;
+using ble_svc::jkp::encode_sample_rate;
 
 std::array<std::uint8_t, 4> f32_bytes( float value )
 {
@@ -29,13 +29,13 @@ std::array<std::uint8_t, 4> f32_bytes( float value )
              static_cast<std::uint8_t>( bits >> 24U ) };
 }
 
-TEST( JkpProtocolTest, EncodesTheCalibration )
+TEST( JkpProtocol, EncodesTheCalibration )
 {
     // 1.5f is 0x3FC00000.
     EXPECT_EQ( encode_calibration( 1, 3, 1.5F ), ( std::array<std::uint8_t, 6>{ 0x01, 0x03, 0x00, 0x00, 0xC0, 0x3F } ) );
 }
 
-TEST( JkpProtocolTest, DecodesACalibrationWeight )
+TEST( JkpProtocol, DecodesACalibrationWeight )
 {
     auto const bytes = f32_bytes( 20.5F );
     EXPECT_EQ( decode_calibration_kg( bytes ), 20.5F );
@@ -43,7 +43,7 @@ TEST( JkpProtocolTest, DecodesACalibrationWeight )
     EXPECT_EQ( decode_calibration_kg( zero ), 0.0F );
 }
 
-TEST( JkpProtocolTest, RejectsAWeightOfTheWrongLength )
+TEST( JkpProtocol, RejectsAWeightOfTheWrongLength )
 {
     constexpr std::array<std::uint8_t, 3> short_value{ 0x00, 0x00, 0xA4 };
     EXPECT_EQ( decode_calibration_kg( short_value ), std::unexpected( std::errc::message_size ) );
@@ -51,7 +51,7 @@ TEST( JkpProtocolTest, RejectsAWeightOfTheWrongLength )
     EXPECT_EQ( decode_calibration_kg( long_value ), std::unexpected( std::errc::message_size ) );
 }
 
-TEST( JkpProtocolTest, RejectsNegativeAndNonFiniteWeights )
+TEST( JkpProtocol, RejectsNegativeAndNonFiniteWeights )
 {
     for( float const kg :
          { -1.0F, std::numeric_limits<float>::infinity(), -std::numeric_limits<float>::infinity(), std::numeric_limits<float>::quiet_NaN() } ) {
@@ -60,7 +60,7 @@ TEST( JkpProtocolTest, RejectsNegativeAndNonFiniteWeights )
     }
 }
 
-TEST( JkpProtocolTest, ResetTakesOnlyItsValue )
+TEST( JkpProtocol, ResetTakesOnlyItsValue )
 {
     constexpr std::array<std::uint8_t, 1> reset{ 0x01 };
     EXPECT_TRUE( decode_reset_calibration( reset ) );
@@ -71,12 +71,12 @@ TEST( JkpProtocolTest, ResetTakesOnlyItsValue )
     EXPECT_EQ( decode_reset_calibration( {} ), std::unexpected( std::errc::message_size ) );
 }
 
-TEST( JkpProtocolTest, EncodesTheSampleRate )
+TEST( JkpProtocol, EncodesTheSampleRate )
 {
     EXPECT_EQ( encode_sample_rate( hal::SampleRate::sps1000 ), ( std::array<std::uint8_t, 2>{ 0xE8, 0x03 } ) );
 }
 
-TEST( JkpProtocolTest, DecodesEverySampleRate )
+TEST( JkpProtocol, DecodesEverySampleRate )
 {
     for( hal::SampleRate const rate : hal::all_sample_rates ) {
         auto const bytes = encode_sample_rate( rate );
@@ -84,7 +84,7 @@ TEST( JkpProtocolTest, DecodesEverySampleRate )
     }
 }
 
-TEST( JkpProtocolTest, RejectsAnUnsupportedSampleRate )
+TEST( JkpProtocol, RejectsAnUnsupportedSampleRate )
 {
     constexpr std::array<std::uint8_t, 2> hundred{ 100, 0 };
     EXPECT_EQ( decode_sample_rate( hundred ), std::unexpected( std::errc::not_supported ) );

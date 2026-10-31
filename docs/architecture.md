@@ -110,7 +110,7 @@ load_cell_svc/
 
 1. **A component's public header holds its interface and an accessor** (`ILoadCell &load_cell()`).
 2. **Logic classes take interfaces in their constructors, never accessors.** That is what makes them testable with mocks.
-3. **Only the production file (`<component>.cpp`) uses accessors and binds hardware.** It is the one place where concrete types, devicetree aliases and other components meet. Zephyr's build-time macros (`K_THREAD_DEFINE`, `K_MUTEX_DEFINE`, `BT_GATT_SERVICE_DEFINE`, zbus listeners) also live in the production file that uses them, and are injected into logic classes by reference where needed (e.g. `ble_svc`'s client mutex).
+3. **Only the production file (`<component>.cpp`) uses accessors and binds hardware.** It is the one place where concrete types, devicetree aliases and other components meet. A component made of several parts of the same kind gives each its own production file: `ble_svc`'s core is `ble_svc.cpp`, and each GATT service is a `<name>_service.cpp` beside it. Zephyr's build-time macros (`K_THREAD_DEFINE`, `K_MUTEX_DEFINE`, `BT_GATT_SERVICE_DEFINE`, zbus listeners) also live in the production file that uses them, and are injected into logic classes by reference where needed (e.g. `ble_svc`'s client mutex).
 4. **Production instances are `constinit`** when their dependencies are in the same file, so there is no constructor ordering between files. An instance that needs another component's accessor is built on first use instead (a function-local static, e.g. `measurement_manager`'s `measurement()`), before any thread that uses it starts.
 5. **A component's mock ships with it** (`mocks/`), so every consumer's tests use the same one. HAL mocks live in `lib/hal/mocks`.
 6. **Logic classes are named for the thing they model**, not the component: the namespace already says which component (`load_cell_svc::LoadCell`, not `load_cell_svc::LoadCellService`).
@@ -137,8 +137,7 @@ Tests construct a fresh instance per test with mocks: no singleton reset, no lin
 | `identity_svc` | settings (`identity/id`), the random number generator |
 | `load_cell_svc` | `load-cell-adc` (ADS1220), settings (`load_cell/factor`, `load_cell/rate`) |
 | `pmic_svc` | `pmic-charger` and `pmic-regulators` (the nPM1300) |
-| `ble_svc` | `identity_svc::identity()`, channels `progressor_command` and `client_connection` (out), `battery` (in, for the Battery service) |
-| `jkp_svc` | `identity_svc::identity()`, `load_cell_svc::load_cell()` (the thread-safe sample rate only), channels `config_command` (out) and `calibration_state` (in) |
+| `ble_svc` | `identity_svc::identity()`, `load_cell_svc::load_cell()` (the thread-safe sample rate only, for the JustKeepPulling service), channels `progressor_command`, `config_command` and `client_connection` (out), `battery` and `calibration_state` (in) |
 | `measurement_manager` | `load_cell_svc::load_cell()`, `ble_svc::client()`, `identity_svc::identity()`, channels `progressor_command`, `config_command` and `client_connection` (in), `measurement_state` and `calibration_state` (out), `battery` (read) |
 | `motion_svc` | `motion-sensor` (the IMU and its interrupt pin) |
 | `led_svc` | `status-led-red`, `status-led-green`, `status-led-blue` (GPIO) |

@@ -119,19 +119,22 @@ classDiagram
             +disconnect() Result
         }
         class Client {
-            <<GATT adapter>>
+            <<core: stack, advertising, connection>>
+            advertised_name(DeviceId) Progressor_NNNN
+        }
+        class TindeqService {
+            <<GATT service>>
             Progressor service 7e4e1701
             data point 7e4e1702: notify
             control point 7e4e1703: write
-            advertised_name(DeviceId) Progressor_NNNN
-            Device Information and Battery services
-            battery_level_percent(mV) uint8
         }
-    }
-
-    namespace jkp_svc {
+        class BatteryService {
+            <<GATT service: Zephyr BAS>>
+            battery_level_percent(mV) uint8
+            Device Information: Kconfig only
+        }
         class JkpService {
-            <<GATT service, static>>
+            <<GATT service>>
             JustKeepPulling service a6bd0001
             calibration a6bd0002: read, notify
             add calibration point a6bd0003: write kg
@@ -389,8 +392,9 @@ classDiagram
     npm1300_emul ..> Npm13xxCharger : answers Zephyr's drivers over I2C
     progressor_command ..> Event : listener, queue
     client_connection ..> Event : listener, queue
-    Client ..> progressor : decode_command
-    Client ..> progressor_command : publishes
+    Client --> TindeqService : notifies its data point
+    TindeqService ..> progressor : decode_command
+    TindeqService ..> progressor_command : publishes
     Client ..> client_connection : publishes
     Client ..> IIdentity : name from id()
     JkpService ..> jkp_protocol : check writes, encode values
@@ -401,7 +405,7 @@ classDiagram
     config_command ..> Event : listener, queue
     config_command ..> Activity : listener, queue
     Measurement ..> calibration_state : publishes
-    battery ..> Client : listener, Battery service level
+    battery ..> BatteryService : listener, level
     Ads1220 ..> ads1220_driver
     ads1220_emul ..> ads1220_driver : answers its SPI
 ```
@@ -426,6 +430,5 @@ Each component's production file binds the concrete types (see `docs/architectur
 | `motion_svc::motion()` | `Motion` on `hal::zephyr::SensorMotion` and `GpioWakeSystemOff` | devicetree alias `motion-sensor`: the XIAO's LSM6DS3TR-C (Zephyr's LSM6DSL driver, patched; deferred init after the PMIC's LDO1), its INT1 (P0.06) waking the SoC; or the emulated chip on native_sim |
 | `led_svc::led()` | `Led` on three `hal::zephyr::GpioOutput`s | devicetree aliases `status-led-red`, `-green`, `-blue`: the XIAO's RGB LED (active low; red P1.22, green P1.24, blue P1.23, as Seeed's current board files), or emulated GPIOs on native_sim |
 | `pmic_svc::pmic()` | `Pmic` on `hal::zephyr::Npm13xxCharger` and `RegulatorShipMode` | devicetree aliases `pmic-charger` and `pmic-regulators`: the XIAO's nPM1300 (bit-banged I2C on P1.18/P1.17), or the emulated chip on native_sim |
-| `ble_svc::client()` | `Client` in `ble_svc.cpp` | Bluetooth: the Progressor GATT service, advertising as `Progressor_NNNN` (NNNN from the device ID) |
-| (none: `jkp_svc` has no API) | `BT_GATT_SERVICE_DEFINE` in `jkp_svc.cpp` | Bluetooth: the JustKeepPulling GATT service, beside the Progressor one; reads `identity()` and `load_cell()`'s sample rate |
+| `ble_svc::client()` | `Client` in `ble_svc.cpp`; the GATT services in `tindeq_service.cpp`, `jkp_service.cpp` and `battery_service.cpp` | Bluetooth: advertising as `Progressor_NNNN` (NNNN from the device ID), the Tindeq Progressor, JustKeepPulling (reads `identity()` and `load_cell()`'s sample rate), Device Information and Battery services |
 | `load_cell_svc::load_cell()` | `LoadCell` on `hal::zephyr::Ads1220` | devicetree alias `load-cell-adc`: the ADS1220 on the XIAO's SPI (`/CS` P1.00, `/DRDY` P1.31), or the emulated chip on native_sim |

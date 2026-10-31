@@ -26,7 +26,7 @@
 #include <system_error>
 #include <utility>
 
-namespace jkp_svc
+namespace ble_svc::jkp
 {
 
 /** @brief Calibration value: status (channels::CalibrationStatus), points, factor in g per ADC code (f32). */
@@ -93,4 +93,4 @@ inline constexpr std::size_t sample_rate_size = 2;
     return hal::to_sample_rate( static_cast<std::uint16_t>( value[0] | ( value[1] << 8U ) ) );
 }
 
-} // namespace jkp_svc
+} // namespace ble_svc::jkp

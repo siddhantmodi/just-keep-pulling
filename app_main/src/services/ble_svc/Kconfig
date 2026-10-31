@@ -4,11 +4,22 @@ config APP_BLE_SVC
 	bool "BLE service"
 	depends on BT_PERIPHERAL && ZBUS && APP_IDENTITY_SVC
 	help
-	  The Tindeq Progressor GATT service and connectable advertising as
-	  Progressor_NNNN. Control point writes are published to zbus; the
-	  measurement manager answers through ble_svc::client().
+	  Bluetooth: connectable advertising as Progressor_NNNN, connections,
+	  and the GATT services: the Tindeq Progressor service (control point
+	  writes are published to zbus; the measurement manager answers through
+	  ble_svc::client()), the JustKeepPulling service, and the standard
+	  Device Information (BT_DIS) and Battery (BT_BAS) services.
 
 if APP_BLE_SVC
+
+config APP_BLE_SVC_JKP
+	bool "JustKeepPulling service"
+	default y
+	depends on APP_LOAD_CELL_SVC
+	help
+	  Our own GATT service, beside the Progressor one: calibration, the
+	  sample rate and the full device ID, for any GATT client (e.g. nRF
+	  Connect). Requests are published to zbus for the measurement manager.
 
 config APP_BLE_SVC_MAX_QUEUED_NOTIFICATIONS
 	int "Data point notifications queued at most"

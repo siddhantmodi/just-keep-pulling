@@ -1,16 +1,17 @@
 /**
  * @file ble_svc.cpp
- * @brief BLE adapter: the Progressor GATT table, advertising, connection handling and the IClient implementation.
+ * @brief ble_svc's core: the Bluetooth stack, advertising, connection handling
+ *        and the IClient implementation.
  *
- * Also serves the standard Device Information service (configured in Kconfig)
- * and Battery service (its level estimated from channels::battery), for
- * generic apps such as nRF Connect.
+ * The GATT services are parts of the component, each in its own file:
+ * tindeq_service.cpp (Tindeq Progressor), jkp_service.cpp (JustKeepPulling),
+ * battery_service.cpp (the level for Zephyr's Battery service); the Device
+ * Information service is configured in Kconfig.
  *
- * Callbacks run in Bluetooth threads. A control point write is decoded
- * (progressor.hpp) and published to zbus for the measurement manager;
- * connection changes are published too. Notifications are sent from the
- * manager's thread through client(), without waiting for buffers, so a slow
- * link drops packets instead of stalling sampling.
+ * Callbacks run in Bluetooth threads; connection changes are published to
+ * zbus. Notifications are sent from the measurement manager's thread through
+ * client(), without waiting for buffers, so a slow link drops packets instead
+ * of stalling sampling.
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -18,10 +19,9 @@
 #include "ble_svc.hpp"
 
 #include "advertising.hpp"
-#include "battery_level.hpp"
 #include "channels.hpp"
 #include "identity_svc.hpp"
-#include "progressor.hpp"
+#include "tindeq_service.hpp"
 
 #include <zephyr/bluetooth/att.h>
 #include <zephyr/bluetooth/bluetooth.h>
@@ -29,16 +29,13 @@
 #include <zephyr/bluetooth/gap.h>
 #include <zephyr/bluetooth/gatt.h>
 #include <zephyr/bluetooth/hci_types.h>
-#include <zephyr/bluetooth/services/bas.h>
 #include <zephyr/bluetooth/uuid.h>
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
-#include <zephyr/zbus/zbus.h>
 
 #include <array>
 #include <atomic>
 #include <cstdint>
-#include <expected>
 #include <fw/scoped_lock.hpp>
 #include <span>
 #include <system_error>
@@ -54,10 +51,6 @@ K_MUTEX_DEFINE( ble_svc_client_mutex );
 namespace
 {
 
-const bt_uuid_128 service_uuid = BT_UUID_INIT_128( BT_UUID_128_ENCODE( 0x7e4e1701, 0x1ea6, 0x40c9, 0x9dcc, 0x13d34ffead57 ) );
-const bt_uuid_128 data_point_uuid = BT_UUID_INIT_128( BT_UUID_128_ENCODE( 0x7e4e1702, 0x1ea6, 0x40c9, 0x9dcc, 0x13d34ffead57 ) );
-const bt_uuid_128 control_point_uuid = BT_UUID_INIT_128( BT_UUID_128_ENCODE( 0x7e4e1703, 0x1ea6, 0x40c9, 0x9dcc, 0x13d34ffead57 ) );
-
 /** @brief Fast advertising after boot or a disconnect, then slow, as Crimpdeq. Intervals in 0.625 ms units. */
 constexpr std::uint16_t fast_advertising_interval = 256;  // 160 ms
 constexpr std::uint16_t slow_advertising_interval = 1636; // 1022.5 ms
@@ -69,57 +62,6 @@ constexpr bt_le_conn_param idle_params = BT_LE_CONN_PARAM_INIT( 24, 40, 4, 400 )
 
 /** @brief The ATT MTU before the client exchanges a larger one. */
 constexpr std::uint16_t default_att_mtu = 23;
-
-ssize_t write_control_point( bt_conn * /*conn*/, const bt_gatt_attr * /*attr*/, const void *buf, std::uint16_t len, std::uint16_t offset,
-                             std::uint8_t /*flags*/ )
-{
-    if( offset != 0 ) {
-        return BT_GATT_ERR( BT_ATT_ERR_INVALID_OFFSET );
-    }
-    std::span const bytes{ static_cast<const std::uint8_t *>( buf ), len };
-
-    // Malformed and unknown commands are accepted and ignored, as Crimpdeq does:
-    // the protocol has no error response, and most writes come without one.
-    auto command = progressor::decode_command( bytes );
-    if( !command ) {
-        if( command.error() == std::errc::not_supported ) {
-            LOG_WRN( "unsupported opcode 0x%02x ignored", bytes[0] );
-        } else {
-            LOG_WRN( "malformed command (%u bytes) ignored", len );
-        }
-        return len;
-    }
-    LOG_DBG( "command 0x%02x", static_cast<unsigned>( command->opcode ) );
-    if( auto ret = channels::progressor_command.publish( *command ); !ret ) {
-        LOG_ERR( "command publish failed: %d", fw::err::to_zephyr( ret.error() ) );
-        return BT_GATT_ERR( BT_ATT_ERR_UNLIKELY );
-    }
-    return len;
-}
-
-void on_data_point_subscription( const bt_gatt_attr * /*attr*/, std::uint16_t value )
-{
-    LOG_INF( "data point notifications %s", value == BT_GATT_CCC_NOTIFY ? "on" : "off" );
-}
-
-// Not const: the stack keeps each client's subscription in it.
-bt_gatt_ccc_managed_user_data data_point_ccc = BT_GATT_CCC_MANAGED_USER_DATA_INIT( on_data_point_subscription, nullptr, nullptr );
-
-} // namespace
-
-// NOLINTBEGIN(modernize-avoid-c-arrays): Zephyr's GATT macros declare the attribute arrays.
-BT_GATT_SERVICE_DEFINE( progressor_service, BT_GATT_PRIMARY_SERVICE( &service_uuid.uuid ),
-                        BT_GATT_CHARACTERISTIC( &data_point_uuid.uuid, BT_GATT_CHRC_NOTIFY, BT_GATT_PERM_NONE, nullptr, nullptr, nullptr ),
-                        BT_GATT_CCC_MANAGED( &data_point_ccc, BT_GATT_PERM_READ | BT_GATT_PERM_WRITE ),
-                        BT_GATT_CHARACTERISTIC( &control_point_uuid.uuid, BT_GATT_CHRC_WRITE | BT_GATT_CHRC_WRITE_WITHOUT_RESP, BT_GATT_PERM_WRITE,
-                                                nullptr, write_control_point, nullptr ) );
-// NOLINTEND(modernize-avoid-c-arrays)
-
-namespace
-{
-
-/** @brief The data point's value attribute: after the service and the characteristic declarations. */
-const bt_gatt_attr &data_point_attr = progressor_service.attrs[2];
 
 /**
  * @brief The connection, shared between Bluetooth callbacks and the manager's
@@ -172,7 +114,8 @@ fw::Result<> Client::send( std::span<const std::uint8_t> packet )
         return std::unexpected( std::errc::not_connected );
     }
     fw::Result<> result{};
-    if( !bt_gatt_is_subscribed( conn, &data_point_attr, BT_GATT_CCC_NOTIFY ) ) {
+    const bt_gatt_attr &data_point = ble_svc::tindeq_data_point();
+    if( !bt_gatt_is_subscribed( conn, &data_point, BT_GATT_CCC_NOTIFY ) ) {
         result = std::unexpected( std::errc::not_connected );
     } else {
         {
@@ -185,7 +128,7 @@ fw::Result<> Client::send( std::span<const std::uint8_t> packet )
         }
         if( result ) {
             bt_gatt_notify_params params{};
-            params.attr = &data_point_attr;
+            params.attr = &data_point;
             params.data = packet.data();
             params.len = static_cast<std::uint16_t>( packet.size() );
             params.func = notification_sent;
@@ -304,7 +247,7 @@ const std::array<bt_data, 2> adv_data{ {
     BT_DATA( BT_DATA_NAME_COMPLETE, name.data(), ble_svc::name_size - 1 ),
 } };
 const std::array<bt_data, 1> scan_data{ {
-    BT_DATA( BT_DATA_UUID128_ALL, service_uuid.val, sizeof( service_uuid.val ) ),
+    BT_DATA( BT_DATA_UUID128_ALL, ble_svc::tindeq_service_uuid.val, sizeof( ble_svc::tindeq_service_uuid.val ) ),
 } };
 
 fw::Result<> start_advertising( std::uint16_t interval )
@@ -391,36 +334,6 @@ void on_att_mtu_updated( bt_conn * /*conn*/, std::uint16_t tx, std::uint16_t rx 
 bt_gatt_cb gatt_callbacks = {
     .att_mtu_updated = on_att_mtu_updated,
 };
-
-// The standard Battery service, for generic apps (e.g. nRF Connect); the
-// Progressor protocol has its own battery command.
-constinit std::atomic<std::uint8_t> battery_level{ 100 };
-
-void update_battery_service( k_work * /*work*/ )
-{
-    // On the system work queue, where a notification never waits for a buffer.
-    if( int const err = bt_bas_set_battery_level( battery_level.load( std::memory_order_relaxed ) ); err != 0 && err != -ENOTCONN ) {
-        LOG_DBG( "battery level not updated: %d", err );
-    }
-}
-
-/** @brief zbus listener on channels::battery: runs in the publisher's thread, so it only hands the level on. */
-void on_battery( const zbus_channel *chan );
-
-} // namespace
-
-K_WORK_DEFINE( ble_svc_battery_work, update_battery_service );
-ZBUS_LISTENER_DEFINE( ble_svc_battery_listener, on_battery );
-ZBUS_CHAN_ADD_OBS( battery_chan, ble_svc_battery_listener, 0 );
-
-namespace
-{
-
-void on_battery( const zbus_channel * /*chan*/ )
-{
-    battery_level.store( ble_svc::battery_level_percent( channels::battery.const_msg().millivolts ), std::memory_order_relaxed );
-    k_work_submit( &ble_svc_battery_work );
-}
 
 } // namespace
 

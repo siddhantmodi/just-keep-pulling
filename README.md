@@ -57,7 +57,7 @@ app_main/             The dynamometer firmware (XIAO nRF54LM20A; native_sim for 
   src/main.cpp
   src/channels/       zbus channels: the message contracts shared by every layer
   src/managers/       Own a thread and an event queue (measurement_manager, power_manager)
-  src/services/       One subsystem or peripheral each (identity_svc, load_cell_svc, ble_svc, jkp_svc, pmic_svc, motion_svc, led_svc)
+  src/services/       One subsystem or peripheral each (identity_svc, load_cell_svc, ble_svc and its GATT services, pmic_svc, motion_svc, led_svc)
   src/modules/        Pure logic, no Zephyr (calibration, progressor)
   src/debug_shell/    "jkp" shell commands, debug builds only
     <component>/      Each component:

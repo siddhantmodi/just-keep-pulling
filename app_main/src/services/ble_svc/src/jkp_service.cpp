@@ -1,5 +1,5 @@
 /**
- * @file jkp_svc.cpp
+ * @file jkp_service.cpp
  * @brief The JustKeepPulling GATT service: calibration, the sample rate and the
  *        device ID, for what the Progressor protocol has no command for.
  *
@@ -33,7 +33,7 @@
 #include <system_error>
 #include <utility>
 
-LOG_MODULE_REGISTER( jkp_svc, CONFIG_APP_JKP_SVC_LOG_LEVEL );
+LOG_MODULE_DECLARE( ble_svc, CONFIG_APP_BLE_SVC_LOG_LEVEL );
 
 namespace
 {
@@ -65,13 +65,13 @@ ssize_t publish( const channels::ConfigCommand &command, std::uint16_t len )
     return len;
 }
 
-fw::Result<std::array<std::uint8_t, jkp_svc::calibration_size>> encoded_calibration()
+fw::Result<std::array<std::uint8_t, ble_svc::jkp::calibration_size>> encoded_calibration()
 {
     auto state = channels::calibration_state.read( channel_timeout );
     if( !state ) {
         return std::unexpected( state.error() );
     }
-    return jkp_svc::encode_calibration( std::to_underlying( state->status ), state->points, state->factor_g_per_code );
+    return ble_svc::jkp::encode_calibration( std::to_underlying( state->status ), state->points, state->factor_g_per_code );
 }
 
 ssize_t read_calibration( bt_conn *conn, const bt_gatt_attr *attr, void *buf, std::uint16_t len, std::uint16_t offset )
@@ -89,7 +89,7 @@ ssize_t write_add_calibration_point( bt_conn * /*conn*/, const bt_gatt_attr * /*
     if( offset != 0 ) {
         return BT_GATT_ERR( BT_ATT_ERR_INVALID_OFFSET );
     }
-    auto kg = jkp_svc::decode_calibration_kg( { static_cast<const std::uint8_t *>( buf ), len } );
+    auto kg = ble_svc::jkp::decode_calibration_kg( { static_cast<const std::uint8_t *>( buf ), len } );
     if( !kg ) {
         return write_error( kg.error() );
     }
@@ -103,7 +103,7 @@ ssize_t write_reset_calibration( bt_conn * /*conn*/, const bt_gatt_attr * /*attr
     if( offset != 0 ) {
         return BT_GATT_ERR( BT_ATT_ERR_INVALID_OFFSET );
     }
-    if( auto ret = jkp_svc::decode_reset_calibration( { static_cast<const std::uint8_t *>( buf ), len } ); !ret ) {
+    if( auto ret = ble_svc::jkp::decode_reset_calibration( { static_cast<const std::uint8_t *>( buf ), len } ); !ret ) {
         return write_error( ret.error() );
     }
     return publish( { .type = channels::ConfigCommand::Type::reset_calibration, .calibration_kg = 0.0F, .samples_per_second = 0 }, len );
@@ -112,7 +112,7 @@ ssize_t write_reset_calibration( bt_conn * /*conn*/, const bt_gatt_attr * /*attr
 ssize_t read_sample_rate( bt_conn *conn, const bt_gatt_attr *attr, void *buf, std::uint16_t len, std::uint16_t offset )
 {
     // The configured rate is the one load-cell value safe to read from another thread.
-    auto const value = jkp_svc::encode_sample_rate( load_cell_svc::load_cell().sample_rate() );
+    auto const value = ble_svc::jkp::encode_sample_rate( load_cell_svc::load_cell().sample_rate() );
     return bt_gatt_attr_read( conn, attr, buf, len, offset, value.data(), value.size() );
 }
 
@@ -122,7 +122,7 @@ ssize_t write_sample_rate( bt_conn * /*conn*/, const bt_gatt_attr * /*attr*/, co
     if( offset != 0 ) {
         return BT_GATT_ERR( BT_ATT_ERR_INVALID_OFFSET );
     }
-    auto rate = jkp_svc::decode_sample_rate( { static_cast<const std::uint8_t *>( buf ), len } );
+    auto rate = ble_svc::jkp::decode_sample_rate( { static_cast<const std::uint8_t *>( buf ), len } );
     if( !rate ) {
         return write_error( rate.error() );
     }
@@ -188,16 +188,16 @@ void on_calibration_state( const zbus_channel *chan );
 
 } // namespace
 
-K_WORK_DEFINE( jkp_svc_calibration_work, notify_calibration );
-ZBUS_LISTENER_DEFINE( jkp_svc_calibration_listener, on_calibration_state );
-ZBUS_CHAN_ADD_OBS( calibration_state_chan, jkp_svc_calibration_listener, 0 );
+K_WORK_DEFINE( ble_svc_jkp_calibration_work, notify_calibration );
+ZBUS_LISTENER_DEFINE( ble_svc_jkp_calibration_listener, on_calibration_state );
+ZBUS_CHAN_ADD_OBS( calibration_state_chan, ble_svc_jkp_calibration_listener, 0 );
 
 namespace
 {
 
 void on_calibration_state( const zbus_channel * /*chan*/ )
 {
-    k_work_submit( &jkp_svc_calibration_work );
+    k_work_submit( &ble_svc_jkp_calibration_work );
 }
 
 } // namespace
