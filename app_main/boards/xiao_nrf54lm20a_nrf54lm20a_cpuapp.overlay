@@ -71,3 +71,31 @@
 		low-side-power-switch;
 	};
 };
+
+/*
+ * Nordic's SoftDevice Controller, as on Nordic's own nRF54LM20 DK. Seeed's
+ * board picks Zephyr's experimental software link layer, which conflicts with it.
+ * The SoftDevice Controller's MPSL also needs the clock sources the DK enables
+ * and Seeed's board leaves disabled (the XIAO has both crystals).
+ */
+/ {
+	chosen {
+		zephyr,bt-hci = &bt_hci_sdc;
+	};
+};
+
+&bt_hci_controller {
+	status = "disabled";
+};
+
+&xo {
+	status = "okay";
+};
+
+&lfclk {
+	status = "okay";
+};
+
+&xo24m {
+	status = "okay";
+};

@@ -1,0 +1,27 @@
+# SPDX-License-Identifier: Apache-2.0
+
+config APP_BLE_SVC
+	bool "BLE service"
+	depends on BT_PERIPHERAL && ZBUS && APP_IDENTITY_SVC
+	help
+	  The Tindeq Progressor GATT service and connectable advertising as
+	  Progressor_NNNN. Control point writes are published to zbus; the
+	  measurement manager answers through ble_svc::client().
+
+if APP_BLE_SVC
+
+config APP_BLE_SVC_MAX_QUEUED_NOTIFICATIONS
+	int "Data point notifications queued at most"
+	default 8
+	help
+	  Notifications handed to the Bluetooth stack and not yet sent. Beyond
+	  this, send() drops the packet instead of waiting for a buffer, so the
+	  measurement manager never blocks on a slow link. Must be below
+	  BT_ATT_TX_COUNT, leaving buffers for other ATT traffic.
+
+endif # APP_BLE_SVC
+
+# Outside "if APP_BLE_SVC" so the unit test gets the log level too.
+module = APP_BLE_SVC
+module-str = ble_svc
+source "subsys/logging/Kconfig.template.log_config"

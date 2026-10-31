@@ -2,7 +2,7 @@
 
 How `app_main`'s interfaces, classes, modules and drivers fit together, and what each offers. Keep this diagram in step with the code: a change to an interface or a new component updates it in the same commit.
 
-Conventions: `<<interface>>` classes are the seams that tests mock; a solid arrow is a reference held by an object, a dashed arrow is a call or use. Methods return `fw::Result` (`Result~T~` here) unless shown otherwise. Mocks (`hal::mocks::MockLoadCellAdc`, `load_cell_svc::MockLoadCell`) implement each interface for unit tests and are left out to keep the diagram readable.
+Conventions: `<<interface>>` classes are the seams that tests mock; a solid arrow is a reference held by an object, a dashed arrow is a call or use. Methods return `fw::Result` (`Result~T~` here) unless shown otherwise. Mocks (`hal::mocks::MockLoadCellAdc`, `load_cell_svc::MockLoadCell`, `ble_svc::MockClient`) implement each interface for unit tests and are left out to keep the diagram readable.
 
 ```mermaid
 classDiagram
@@ -62,6 +62,34 @@ classDiagram
         class ForceSample {
             +float kg
             +uint64 timestamp_us
+        }
+    }
+
+    namespace ble_svc {
+        class IClient {
+            <<interface>>
+            +send(bytes) Result
+            +att_mtu() uint16
+            +set_streaming(bool) Result
+            +disconnect() Result
+        }
+        class Client {
+            <<GATT adapter>>
+            Progressor service 7e4e1701
+            data point 7e4e1702: notify
+            control point 7e4e1703: write
+            advertised_name(DeviceId) Progressor_NNNN
+        }
+    }
+
+    namespace channels {
+        class progressor_command {
+            <<zbus>>
+            progressor::Command
+        }
+        class client_connection {
+            <<zbus>>
+            bool connected
         }
     }
 
@@ -140,11 +168,13 @@ classDiagram
 
     IIdentity <|.. Identity
     ILoadCell <|.. LoadCell
+    IClient <|.. Client
     ILoadCellAdc <|.. Ads1220
 
     main ..> IIdentity : identity()
     main ..> ILoadCell : load_cell()
     main ..> fw_settings : init
+    main ..> Client : ble_svc init()
     debug_shell ..> IIdentity
     debug_shell ..> ILoadCell : rate only
 
@@ -156,11 +186,15 @@ classDiagram
     LoadCell ..> ForceSample
     ILoadCellAdc ..> SampleRate
     ILoadCellAdc ..> LoadCellSample
+    Client ..> progressor : decode_command
+    Client ..> progressor_command : publishes
+    Client ..> client_connection : publishes
+    Client ..> IIdentity : name from id()
     Ads1220 ..> ads1220_driver
     ads1220_emul ..> ads1220_driver : answers its SPI
 ```
 
-`progressor` is not used yet: the measurement manager (next) turns `ForceSample`s into `progressor` packets, and the Bluetooth service carries them.
+Nothing observes the channels yet: the measurement manager (next) handles the commands, turns `ForceSample`s into `progressor` packets, and answers through `ble_svc::client()`.
 
 ## Production wiring
 
@@ -169,4 +203,5 @@ Each component's production file binds the concrete types (see `docs/architectur
 | Accessor | Instance | Bound to |
 |---|---|---|
 | `identity_svc::identity()` | `Identity` | settings key `identity/id` |
+| `ble_svc::client()` | `Client` in `ble_svc.cpp` | Bluetooth: the Progressor GATT service, advertising as `Progressor_NNNN` (NNNN from the device ID) |
 | `load_cell_svc::load_cell()` | `LoadCell` on `hal::zephyr::Ads1220` | devicetree alias `load-cell-adc`: the ADS1220 on the XIAO's SPI (`/CS` P1.00, `/DRDY` P1.31), or the emulated chip on native_sim |
