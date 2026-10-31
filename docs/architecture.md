@@ -35,8 +35,8 @@ If yes, use it directly. A seam (an injected, mockable dependency) is only neede
 
 Integration tests run the **real app binary** on `native_sim`, not a cut-down fixture app, so they exercise exactly what ships. Bluetooth runs over a virtual radio: `pylib/zephyr_bumble` serves a Bumble controller to the app over TCP HCI (`--bt-dev`) and drives a Bumble central on the same virtual link. Twister launches the app (`harness: pytest`, its `dut` fixture), so the same tests could later drive a flashed board through a USB Bluetooth dongle.
 
-- **What they check:** what a phone would see (discovery, reads, writes, ATT errors), plus the app's log for effects a central cannot observe (`led_svc: LED on`).
-- **Writes are acknowledged once accepted, then applied by the manager.** Tests wait for the resulting state (`eventually`) rather than assuming it is immediate.
+- **What they check:** what a phone would see (discovery, reads, writes, ATT errors), plus the app's log for effects a central cannot observe (`unsupported opcode 0x67 ignored`).
+- **Writes are acknowledged once accepted, then applied by the manager.** Tests wait for the resulting notification, state (`eventually`) or log line rather than assuming it is immediate.
 - **`pylib/zephyr_bumble` stays app-agnostic.** UUIDs, names and expected values live in each app's `integration/` folder.
 
 ## Layers
@@ -79,7 +79,7 @@ Dependencies point down: managers → services → modules. `scripts/check_layer
 
 ### Managers and zbus
 
-A manager has its own event queue (`fw::QueueRef<Event>` over a `k_msgq`). A zbus **listener** on each channel the manager cares about copies the message into the queue and returns. The manager thread takes events off the queue and calls its logic's `handle(const Event &)`, which is what tests call. `app_template/src/managers/app_manager/` is the reference.
+A manager has its own event queue (`fw::QueueRef<Event>` over a `k_msgq`). A zbus **listener** on each channel the manager cares about copies the message into the queue and returns. The manager thread takes events off the queue and calls its logic's `handle(const Event &)`, which is what tests call. `app_main/src/managers/measurement_manager/` is the reference.
 
 - **Every event is handled, in order**, with no allocation: the queue has fixed storage.
 - **One queue for everything.** Timer expiries and interrupts post events to the same queue, without zbus channels of their own.
@@ -97,23 +97,23 @@ Which zbus mechanism to use:
 
 ## Component pattern
 
-`app_template/src/services/led_svc/` is the reference:
+`app_main/src/services/load_cell_svc/` is the reference:
 
 ```
-led_svc/
-  inc/led_svc.hpp     Public: the ILed interface and the accessor led_svc::led(). No concrete types, no Zephyr
-  src/led.hpp/.cpp    Logic: class Led final : ILed, taking hal::IDigitalOutput & in its constructor; logging lives here
-  src/led_svc.cpp     Production instance: constinit GpioOutput on led0 + constinit Led; led() returns it
-  mocks/mock_led.hpp  MockLed, for tests of components that use the LED
-  test/               GoogleTest app: Led with a MockDigitalOutput (builds led.cpp, not led_svc.cpp)
+load_cell_svc/
+  inc/load_cell_svc.hpp     Public: the ILoadCell interface and the accessor load_cell_svc::load_cell(). No concrete types, no Zephyr
+  src/load_cell.hpp/.cpp    Logic: class LoadCell final : ILoadCell, taking hal::ILoadCellAdc & in its constructor; logging lives here
+  src/load_cell_svc.cpp     Production instance: constinit Ads1220 on load-cell-adc + constinit LoadCell; load_cell() returns it
+  mocks/mock_load_cell.hpp  MockLoadCell, for tests of components that use the load cell
+  test/                     GoogleTest app: LoadCell with a MockLoadCellAdc (builds load_cell.cpp, not load_cell_svc.cpp)
 ```
 
-1. **A component's public header holds its interface and an accessor** (`ILed &led()`).
+1. **A component's public header holds its interface and an accessor** (`ILoadCell &load_cell()`).
 2. **Logic classes take interfaces in their constructors, never accessors.** That is what makes them testable with mocks.
-3. **Only the production file (`<component>.cpp`) uses accessors and binds hardware.** It is the one place where concrete types, devicetree aliases and other components meet. Zephyr's build-time macros (`K_THREAD_DEFINE`, `K_MUTEX_DEFINE`, `BT_GATT_SERVICE_DEFINE`, zbus listeners) also live in the production file that uses them, and are injected into logic classes by reference where needed (e.g. `temp_svc`'s read mutex).
-4. **Production instances are `constinit`** when their dependencies are in the same file, so there is no constructor ordering between files. An instance that needs another component's accessor is built on first use instead (a function-local static, e.g. `app_manager`'s `app()`), before any thread that uses it starts.
+3. **Only the production file (`<component>.cpp`) uses accessors and binds hardware.** It is the one place where concrete types, devicetree aliases and other components meet. Zephyr's build-time macros (`K_THREAD_DEFINE`, `K_MUTEX_DEFINE`, `BT_GATT_SERVICE_DEFINE`, zbus listeners) also live in the production file that uses them, and are injected into logic classes by reference where needed (e.g. `ble_svc`'s client mutex).
+4. **Production instances are `constinit`** when their dependencies are in the same file, so there is no constructor ordering between files. An instance that needs another component's accessor is built on first use instead (a function-local static, e.g. `measurement_manager`'s `measurement()`), before any thread that uses it starts.
 5. **A component's mock ships with it** (`mocks/`), so every consumer's tests use the same one. HAL mocks live in `lib/hal/mocks`.
-6. **Logic classes are named for the thing they model**, not the component: the namespace already says which component (`led_svc::Led`, not `led_svc::LedService`).
+6. **Logic classes are named for the thing they model**, not the component: the namespace already says which component (`load_cell_svc::LoadCell`, not `load_cell_svc::LoadCellService`).
 
    **File names follow the component's stem.** A component is `<stem>_svc` or `<stem>_manager`. Its public header and production file take the component's name; its logic class and files, its mock and its test take the stem:
 
@@ -122,22 +122,23 @@ led_svc/
    | `load_cell_svc` | `load_cell_svc.hpp`, `load_cell_svc.cpp` | `LoadCell` in `load_cell.hpp/.cpp` | `mock_load_cell.hpp` | `test_load_cell.cpp` |
    | `measurement_manager` | `measurement_manager.hpp`, `measurement_manager.cpp` | `Measurement` in `measurement.hpp/.cpp` | | `test_measurement.cpp` |
 
-   Other files are named for what they hold (`advertising.hpp`, `gatt_codec.hpp`), never for a generic role (`manager.cpp`, `impl.cpp`, `utils.hpp`), so a file name alone says where it belongs.
+   Other files are named for what they hold (`ble_svc`'s `advertising.hpp`), never for a generic role (`manager.cpp`, `impl.cpp`, `utils.hpp`), so a file name alone says where it belongs.
 
 7. **`docs/<app>.md` holds the app's class diagram** (Mermaid, rendered by GitHub): interfaces with their methods, implementations, modules, drivers and how they connect. A commit that adds a component or changes an interface updates it.
 
 Tests construct a fresh instance per test with mocks: no singleton reset, no link-time seam. A component test builds only the logic `.cpp` files and sources the component's `Kconfig` (for its log level). A HAL implementation is tested once in `lib/hal/test` against an emulator; components never test it again.
 
-**App code is identical on every board.** Board differences live in devicetree: production files bind an alias (`led0`, `die-temp`), and each board's overlay points it at real hardware or an emulator. Where Zephyr has no emulator for a peripheral (e.g. the die temperature sensor), the repo adds a small emulated driver under `drivers/` with a test-control header, instead of `#if` branches in the app. Where the repo has its own driver, the emulator works at the chip's bus level instead (the ADS1220 emulator answers SPI commands on native_sim's SPI emulator bus and pulses an emulated /DRDY pin), so the real driver runs in tests too.
+**App code is identical on every board.** Board differences live in devicetree: production files bind an alias (`load-cell-adc`), and each board's overlay points it at real hardware or an emulator. Where Zephyr has no emulator for a peripheral (e.g. the die temperature sensor that `lib/hal`'s tests use), the repo adds a small emulated driver under `drivers/` with a test-control header, instead of `#if` branches in the app. Where the repo has its own driver, the emulator works at the chip's bus level instead (the ADS1220 emulator answers SPI commands on native_sim's SPI emulator bus and pulses an emulated /DRDY pin), so the real driver runs in tests too.
 
 **Who depends on whom** (wired in production files):
 
 | Component | Uses |
 |---|---|
-| `led_svc` | `led0` (GPIO) |
-| `temp_svc` | `die-temp` (sensor) |
-| `app_manager` | `led_svc::led()`, channels `led_request` (in), `led_state` (out) |
-| `ble_svc` | `temp_svc::temperature()`, channels `led_request` (out), `led_state` (read) |
+| `identity_svc` | settings (`identity/id`), the random number generator |
+| `load_cell_svc` | `load-cell-adc` (ADS1220), settings (`load_cell/factor`, `load_cell/rate`) |
+| `ble_svc` | `identity_svc::identity()`, channels `progressor_command` and `client_connection` (out) |
+| `measurement_manager` | `load_cell_svc::load_cell()`, `ble_svc::client()`, `identity_svc::identity()`, channels `progressor_command` and `client_connection` (in) |
+| `debug_shell` | `identity_svc::identity()`, `load_cell_svc::load_cell()` (the thread-safe sample rate only) |
 
 ## Build variants
 

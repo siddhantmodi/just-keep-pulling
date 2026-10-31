@@ -134,7 +134,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        app: [app_main, app_template]
+        app: [app_main]
     steps:
       - uses: actions/checkout@v6
 
@@ -170,10 +170,6 @@ jobs:
             board_name: xiao_nrf54lm20a
             variant: debug
             extra_args: -- -DEXTRA_CONF_FILE=debug.conf
-          - app: app_template
-            board: nrf54l15dk/nrf54l15/cpuapp
-            board_name: nrf54l15dk
-            variant: release
     env:
       BUILD_DIR: build/${{ matrix.app }}-${{ matrix.board_name }}-${{ matrix.variant }}
       ARTIFACT_PREFIX: ${{ matrix.app }}-${{ matrix.board_name }}-${{ matrix.variant }}

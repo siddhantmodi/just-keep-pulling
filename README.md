@@ -2,11 +2,9 @@
 
 Zephyr RTOS based firmware for a dynamometer for measuring finger strength for rock climbers. Based on the open-source Crimpdeq.
 
-Built on the nRF Connect SDK (NCS) for the nRF54L15 DK, in C++23, with GoogleTest unit tests and Bumble BLE integration tests that run on `native_sim`.
+Built on the nRF Connect SDK (NCS) for the Seeed XIAO nRF54LM20A, in C++23, with GoogleTest unit tests and Bumble BLE integration tests that run on `native_sim`.
 
 The firmware is `app_main`: a finger-strength dynamometer for the Seeed XIAO nRF54LM20A with an ADS1220 load-cell ADC, compatible with the Tindeq Progressor app (Bluetooth protocol as implemented by [Crimpdeq](https://github.com/crimpdeq)). It advertises as `Progressor_NNNN` and answers the Progressor commands: tare, start/stop measurement (streaming timestamped samples), app version, Progressor ID, battery voltage (a placeholder until the PMIC is read), shutdown, and Crimpdeq's add-calibration-point. Power management, the LED and OTA updates are still to come; see `docs/architecture.md` for the patterns it follows and `docs/app_main.md` for how its parts connect.
-
-`app_template` is the reference app the patterns were developed on. It exposes a custom BLE GATT service (advertised as "Just Keep Pulling"): an LED characteristic (read/write, `uint8` 0/1) and the die temperature (read, `int16` little-endian, hundredths of a degree Celsius). The service is open: no pairing is required. See `app_template/src/services/ble_svc/inc/ble_svc.hpp` for the UUIDs.
 
 ## Repository layout
 
@@ -23,26 +21,27 @@ include/jkp/          Their headers; dts/bindings/ holds their devicetree bindin
 docs/architecture.md  Design rules, layers, why C++, and when to revisit them
 docs/app_main.md      app_main's class diagram (Mermaid): interfaces, implementations, modules, drivers
 app_main/             The dynamometer firmware (XIAO nRF54LM20A; native_sim for tests)
-app_template/         Reference app (LED + die temperature over BLE), same layout as below
-  boards/             Devicetree overlays per board (aliases led0, die-temp)
+  boards/             Devicetree overlays per board (alias load-cell-adc: the ADS1220, or its emulator)
+  debug.conf          Debug build variant: adds the shell
   src/main.cpp
   src/channels/       zbus channels: the message contracts shared by every layer
-  src/managers/       Own a thread and an event queue (app_manager)
-  src/services/       One subsystem or peripheral each (led_svc, temp_svc, ble_svc)
-  src/modules/        Pure logic, no Zephyr (none yet)
+  src/managers/       Own a thread and an event queue (measurement_manager)
+  src/services/       One subsystem or peripheral each (identity_svc, load_cell_svc, ble_svc)
+  src/modules/        Pure logic, no Zephyr (calibration, progressor)
+  src/debug_shell/    "jkp" shell commands, debug builds only
     <component>/      Each component:
       inc/            Public API
       src/            Implementation
       mocks/          GoogleMock of its interface, for consumers' tests
       test/           GoogleTest unit test (its own small native_sim app)
-  integration/        pytest + Bumble tests of the whole app over BLE (<app>/testcase.yaml)
+  integration/        pytest + Bumble tests of the whole app over BLE, acting as the Tindeq app (app_main/testcase.yaml)
 pylib/zephyr_bumble/  Reusable pytest plugin: Bumble virtual central for native_sim BLE apps
 requirements-test.txt Python dependencies of the integration tests (installed by west_setup.sh)
 scripts/              check_format.sh, check_layering.sh, run_clang_tidy.py
 .github/workflows/    CI
 ```
 
-Other applications (factory, calibration, samples) go in their own top-level `app_<name>/` directories.
+Other applications (factory, calibration, samples) go in their own top-level `app_<name>/` directories, with the same layout.
 
 The west workspace topdir is the **parent** of this repo; dependencies live in `../deps/`. In the devcontainer that is `/home/user/workspace`, with this repo at `/home/user/workspace/just-keep-pulling`.
 
@@ -50,9 +49,9 @@ The west workspace topdir is the **parent** of this repo; dependencies live in `
 
 - **Errors:** anything that can fail returns `fw::Result<T>` (`std::expected<T, std::errc>`). Zephyr return codes are converted with `fw::err::check()` / `fw::err::from_zephyr()`.
 - **C++:** C++23, no exceptions, no RTTI.
-- **Interfaces at every layer:** a component's public header holds an interface (`led_svc::ILed`) and an accessor to its production instance (`led_svc::led()`). Logic classes take interfaces in their constructors (hardware ones from `lib/hal`, e.g. `hal::IDigitalOutput`), so unit tests inject GoogleMocks; each component's production file binds the real hardware (`hal::zephyr::GpioOutput` on `led0`). See `app_template/src/services/led_svc/`.
+- **Interfaces at every layer:** a component's public header holds an interface (`load_cell_svc::ILoadCell`) and an accessor to its production instance (`load_cell_svc::load_cell()`). Logic classes take interfaces in their constructors (hardware ones from `lib/hal`, e.g. `hal::ILoadCellAdc`), so unit tests inject GoogleMocks; each component's production file binds the real hardware (`hal::zephyr::Ads1220` on `load-cell-adc`). See `app_main/src/services/load_cell_svc/`.
 - **Kernel, zbus, settings:** used for real in unit tests (the tests run on `native_sim`), wrapped only where it removes C boilerplate. See [docs/architecture.md](docs/architecture.md) for the rules.
-- **Managers and zbus:** a manager thread is the only caller of single-threaded services. zbus listeners copy messages into its event queue (see `app_template/src/managers/app_manager/` and [docs/architecture.md](docs/architecture.md)).
+- **Managers and zbus:** a manager thread is the only caller of single-threaded services. zbus listeners copy messages into its event queue (see `app_main/src/managers/measurement_manager/` and [docs/architecture.md](docs/architecture.md)).
 - **Unit tests:** GoogleTest, built for `native_sim` and run by Twister (`harness: gtest`). A test's `prj.conf` sets `CONFIG_GTEST=y`; tests are tagged `unit`.
 - **Integration tests:** the real app on `native_sim`, driven over BLE by a Bumble virtual central (`harness: pytest`, `pylib/zephyr_bumble`); tagged `integration`.
 
@@ -67,12 +66,9 @@ west flash -d build/app_main
 
 # Debug build: adds the shell on the console UART, with "jkp id" and "jkp rate" commands
 west build -b xiao_nrf54lm20a/nrf54lm20a/cpuapp -d build/app_main-debug just-keep-pulling/app_main -- -DEXTRA_CONF_FILE=debug.conf
-
-# The reference app, on the nRF54L15 DK
-west build -b nrf54l15dk/nrf54l15/cpuapp -d build/app_template just-keep-pulling/app_template
 ```
 
-Both apps also build and run on `native_sim/native/64`.
+It also builds and runs on `native_sim/native/64`, with an emulated ADS1220.
 
 ## Testing and checks
 
@@ -82,7 +78,7 @@ Run these from this repo's directory; CI runs the same commands.
 # Unit tests (add --coverage --coverage-tool gcovr --enable-asan --enable-ubsan as CI does)
 west twister -T . -p native_sim/native/64 --tag unit --inline-logs
 
-# Integration tests: the apps on native_sim against a Bumble virtual BLE central
+# Integration tests: the app on native_sim against a Bumble virtual BLE central
 west twister -T . -p native_sim/native/64 --tag integration --inline-logs
 
 # Formatting (--fix to reformat in place)
@@ -91,7 +87,7 @@ scripts/check_format.sh
 # Include rules (HAL interface headers are Zephyr-free; managers -> services -> modules)
 scripts/check_layering.sh
 
-# clang-tidy: builds an app (default app_main; --app app_template) for native_sim with clang, then analyzes it
+# clang-tidy: builds an app (default app_main; --app <app>) for native_sim with clang, then analyzes it
 scripts/run_clang_tidy.py
 ```
 

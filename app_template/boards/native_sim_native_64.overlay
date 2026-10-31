@@ -1,4 +1,0 @@
-/* SPDX-License-Identifier: Apache-2.0 */
-
-/* Zephyr picks overlays by full board target; share the native_sim one. */
-#include "native_sim.overlay"
