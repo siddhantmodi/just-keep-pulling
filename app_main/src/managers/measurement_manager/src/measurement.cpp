@@ -1,11 +1,11 @@
 /**
- * @file manager.cpp
- * @brief measurement_manager::Manager implementation.
+ * @file measurement.cpp
+ * @brief measurement_manager::Measurement implementation.
  *
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include "manager.hpp"
+#include "measurement.hpp"
 
 #include <zephyr/logging/log.h>
 
@@ -41,7 +41,7 @@ bool no_listener( std::errc error )
 
 } // namespace
 
-fw::Result<> Manager::start()
+fw::Result<> Measurement::start()
 {
     // Readings are still usable untared, so a failure (logged by the load cell) is not fatal.
     if( auto ret = load_cell_.tare(); !ret ) {
@@ -50,7 +50,7 @@ fw::Result<> Manager::start()
     return {};
 }
 
-fw::Result<> Manager::handle( const Event &event )
+fw::Result<> Measurement::handle( const Event &event )
 {
     switch( event.type ) {
     case Event::Type::command:
@@ -61,7 +61,7 @@ fw::Result<> Manager::handle( const Event &event )
     return std::unexpected( std::errc::invalid_argument );
 }
 
-fw::Result<> Manager::on_command( const progressor::Command &command )
+fw::Result<> Measurement::on_command( const progressor::Command &command )
 {
     using progressor::Opcode;
 
@@ -100,7 +100,7 @@ fw::Result<> Manager::on_command( const progressor::Command &command )
     return std::unexpected( std::errc::not_supported );
 }
 
-fw::Result<> Manager::on_client_connection( const channels::ClientConnection &connection )
+fw::Result<> Measurement::on_client_connection( const channels::ClientConnection &connection )
 {
     if( !connection.connected && measuring() ) {
         LOG_INF( "client disconnected, measurement stopped" );
@@ -109,7 +109,7 @@ fw::Result<> Manager::on_client_connection( const channels::ClientConnection &co
     return {};
 }
 
-fw::Result<> Manager::start_measurement()
+fw::Result<> Measurement::start_measurement()
 {
     if( measuring() ) {
         // A new measurement on a new timeline, as Crimpdeq: the old one's pending samples are dropped.
@@ -135,7 +135,7 @@ fw::Result<> Manager::start_measurement()
     return {};
 }
 
-fw::Result<> Manager::stop_measurement( bool send_pending )
+fw::Result<> Measurement::stop_measurement( bool send_pending )
 {
     if( !measuring() ) {
         return {};
@@ -155,7 +155,7 @@ fw::Result<> Manager::stop_measurement( bool send_pending )
     return stopped;
 }
 
-fw::Result<> Manager::sample()
+fw::Result<> Measurement::sample()
 {
     if( !rate_ ) {
         return std::unexpected( std::errc::operation_not_permitted );
@@ -188,7 +188,7 @@ fw::Result<> Manager::sample()
     return {};
 }
 
-void Manager::send_batch()
+void Measurement::send_batch()
 {
     if( batch_size_ == 0 ) {
         return;
@@ -210,12 +210,12 @@ void Manager::send_batch()
     LOG_ERR( "samples not sent: %d", fw::err::to_zephyr( sent.error() ) );
 }
 
-fw::Result<> Manager::reply( const progressor::Packet &packet )
+fw::Result<> Measurement::reply( const progressor::Packet &packet )
 {
     return client_.send( packet.bytes() );
 }
 
-std::size_t Manager::batch_capacity() const
+std::size_t Measurement::batch_capacity() const
 {
     std::size_t const per_packet = progressor::samples_per_packet( client_.att_mtu() );
     if( !rate_ ) {

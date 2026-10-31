@@ -1,11 +1,11 @@
 /**
- * @file test_manager.cpp
- * @brief Unit tests of measurement_manager::Manager against a mocked load cell and client.
+ * @file test_measurement.cpp
+ * @brief Unit tests of measurement_manager::Measurement against a mocked load cell and client.
  *
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include "manager.hpp"
+#include "measurement.hpp"
 #include "mock_client.hpp"
 #include "mock_load_cell.hpp"
 
@@ -62,10 +62,10 @@ std::vector<progressor::Sample> samples_in( const std::vector<std::uint8_t> &pac
     return samples;
 }
 
-class ManagerTest : public testing::Test
+class MeasurementTest : public testing::Test
 {
 protected:
-    ManagerTest()
+    MeasurementTest()
     {
         ON_CALL( load_cell_, sample_rate() ).WillByDefault( Return( hal::SampleRate::sps175 ) );
         ON_CALL( load_cell_, start( _ ) ).WillByDefault( Return( fw::Result<>{} ) );
@@ -97,63 +97,63 @@ protected:
     {
         ON_CALL( load_cell_, sample_rate() ).WillByDefault( Return( rate ) );
         period_us_ = 1'000'000U / hal::samples_per_second( rate );
-        ASSERT_TRUE( manager_.handle( command( Opcode::start_measurement ) ) );
+        ASSERT_TRUE( measurement_.handle( command( Opcode::start_measurement ) ) );
     }
 
     void sample( unsigned count )
     {
         for( unsigned i = 0; i < count; ++i ) {
-            ASSERT_TRUE( manager_.sample() );
+            ASSERT_TRUE( measurement_.sample() );
         }
     }
 
     NiceMock<load_cell_svc::MockLoadCell> load_cell_;
     NiceMock<ble_svc::MockClient> client_;
-    measurement_manager::Manager manager_{ load_cell_, client_, id };
+    measurement_manager::Measurement measurement_{ load_cell_, client_, id };
     std::vector<std::vector<std::uint8_t>> sent_;
     float next_kg_{ 0.0F };
     std::uint64_t next_us_{ 12'345'678 };
     std::uint32_t period_us_{ 5714 };
 };
 
-TEST_F( ManagerTest, StartTaresTheScale )
+TEST_F( MeasurementTest, StartTaresTheScale )
 {
     EXPECT_CALL( load_cell_, tare() ).WillOnce( Return( fw::Result<>{} ) );
-    EXPECT_TRUE( manager_.start() );
+    EXPECT_TRUE( measurement_.start() );
 }
 
-TEST_F( ManagerTest, StartSucceedsWhenTheTareFails )
+TEST_F( MeasurementTest, StartSucceedsWhenTheTareFails )
 {
     EXPECT_CALL( load_cell_, tare() ).WillOnce( Return( std::unexpected( std::errc::timed_out ) ) );
-    EXPECT_TRUE( manager_.start() );
+    EXPECT_TRUE( measurement_.start() );
 }
 
-TEST_F( ManagerTest, StartMeasurementSamplesAtTheConfiguredRateAndAsksForStreaming )
+TEST_F( MeasurementTest, StartMeasurementSamplesAtTheConfiguredRateAndAsksForStreaming )
 {
     ON_CALL( load_cell_, sample_rate() ).WillByDefault( Return( hal::SampleRate::sps600 ) );
     EXPECT_CALL( load_cell_, start( hal::SampleRate::sps600 ) ).WillOnce( Return( fw::Result<>{} ) );
     EXPECT_CALL( client_, set_streaming( true ) );
 
-    EXPECT_TRUE( manager_.handle( command( Opcode::start_measurement ) ) );
-    EXPECT_TRUE( manager_.measuring() );
+    EXPECT_TRUE( measurement_.handle( command( Opcode::start_measurement ) ) );
+    EXPECT_TRUE( measurement_.measuring() );
 }
 
-TEST_F( ManagerTest, StartMeasurementFailsWhenTheLoadCellDoes )
+TEST_F( MeasurementTest, StartMeasurementFailsWhenTheLoadCellDoes )
 {
     EXPECT_CALL( load_cell_, start( _ ) ).WillOnce( Return( std::unexpected( std::errc::io_error ) ) );
     EXPECT_CALL( client_, set_streaming( _ ) ).Times( 0 );
 
-    EXPECT_EQ( manager_.handle( command( Opcode::start_measurement ) ), std::unexpected( std::errc::io_error ) );
-    EXPECT_FALSE( manager_.measuring() );
+    EXPECT_EQ( measurement_.handle( command( Opcode::start_measurement ) ), std::unexpected( std::errc::io_error ) );
+    EXPECT_FALSE( measurement_.measuring() );
 }
 
-TEST_F( ManagerTest, SampleFailsWhenNotMeasuring )
+TEST_F( MeasurementTest, SampleFailsWhenNotMeasuring )
 {
     EXPECT_CALL( load_cell_, read( _ ) ).Times( 0 );
-    EXPECT_EQ( manager_.sample(), std::unexpected( std::errc::operation_not_permitted ) );
+    EXPECT_EQ( measurement_.sample(), std::unexpected( std::errc::operation_not_permitted ) );
 }
 
-TEST_F( ManagerTest, BatchesUpTo50MillisecondsOfSamples )
+TEST_F( MeasurementTest, BatchesUpTo50MillisecondsOfSamples )
 {
     start_measuring( hal::SampleRate::sps175 ); // 8 samples in 50 ms
 
@@ -168,7 +168,7 @@ TEST_F( ManagerTest, BatchesUpTo50MillisecondsOfSamples )
     EXPECT_FLOAT_EQ( samples[7].kg, 7.0F );
 }
 
-TEST_F( ManagerTest, TimestampsCountFromOnePeriodBeforeTheFirstSample )
+TEST_F( MeasurementTest, TimestampsCountFromOnePeriodBeforeTheFirstSample )
 {
     start_measuring( hal::SampleRate::sps175 );
     sample( 8 );
@@ -179,7 +179,7 @@ TEST_F( ManagerTest, TimestampsCountFromOnePeriodBeforeTheFirstSample )
     }
 }
 
-TEST_F( ManagerTest, BatchesAtMostWhatOneNotificationCarries )
+TEST_F( MeasurementTest, BatchesAtMostWhatOneNotificationCarries )
 {
     ON_CALL( client_, att_mtu() ).WillByDefault( Return( 23 ) ); // 2 samples
     start_measuring( hal::SampleRate::sps1000 );
@@ -190,7 +190,7 @@ TEST_F( ManagerTest, BatchesAtMostWhatOneNotificationCarries )
     EXPECT_EQ( samples_in( sent_[0] ).size(), 2U );
 }
 
-TEST_F( ManagerTest, SendsThirtySamplesPerNotificationAt1000Sps )
+TEST_F( MeasurementTest, SendsThirtySamplesPerNotificationAt1000Sps )
 {
     start_measuring( hal::SampleRate::sps1000 );
 
@@ -200,7 +200,7 @@ TEST_F( ManagerTest, SendsThirtySamplesPerNotificationAt1000Sps )
     EXPECT_EQ( samples_in( sent_[0] ).size(), 30U );
 }
 
-TEST_F( ManagerTest, SendsEverySampleAtLowRates )
+TEST_F( MeasurementTest, SendsEverySampleAtLowRates )
 {
     start_measuring( hal::SampleRate::sps20 ); // one sample per 50 ms
 
@@ -209,7 +209,7 @@ TEST_F( ManagerTest, SendsEverySampleAtLowRates )
     EXPECT_EQ( sent_.size(), 3U );
 }
 
-TEST_F( ManagerTest, UsesALargerMtuOnceExchanged )
+TEST_F( MeasurementTest, UsesALargerMtuOnceExchanged )
 {
     ON_CALL( client_, att_mtu() ).WillByDefault( Return( 23 ) );
     start_measuring( hal::SampleRate::sps1000 );
@@ -222,34 +222,34 @@ TEST_F( ManagerTest, UsesALargerMtuOnceExchanged )
     EXPECT_EQ( samples_in( sent_[1] ).size(), 30U );
 }
 
-TEST_F( ManagerTest, StopSendsThePendingSamplesAndStopsTheLoadCell )
+TEST_F( MeasurementTest, StopSendsThePendingSamplesAndStopsTheLoadCell )
 {
     start_measuring();
     sample( 3 );
     EXPECT_CALL( load_cell_, stop() ).WillOnce( Return( fw::Result<>{} ) );
     EXPECT_CALL( client_, set_streaming( false ) );
 
-    EXPECT_TRUE( manager_.handle( command( Opcode::stop_measurement ) ) );
+    EXPECT_TRUE( measurement_.handle( command( Opcode::stop_measurement ) ) );
 
     ASSERT_EQ( sent_.size(), 1U );
     EXPECT_EQ( samples_in( sent_[0] ).size(), 3U );
-    EXPECT_FALSE( manager_.measuring() );
+    EXPECT_FALSE( measurement_.measuring() );
 }
 
-TEST_F( ManagerTest, StopWhenNotMeasuringDoesNothing )
+TEST_F( MeasurementTest, StopWhenNotMeasuringDoesNothing )
 {
     EXPECT_CALL( load_cell_, stop() ).Times( 0 );
-    EXPECT_TRUE( manager_.handle( command( Opcode::stop_measurement ) ) );
+    EXPECT_TRUE( measurement_.handle( command( Opcode::stop_measurement ) ) );
     EXPECT_TRUE( sent_.empty() );
 }
 
-TEST_F( ManagerTest, StartWhileMeasuringStartsANewTimeline )
+TEST_F( MeasurementTest, StartWhileMeasuringStartsANewTimeline )
 {
     start_measuring();
     sample( 3 );
     EXPECT_CALL( load_cell_, start( _ ) ).Times( 0 );
 
-    ASSERT_TRUE( manager_.handle( command( Opcode::start_measurement ) ) );
+    ASSERT_TRUE( measurement_.handle( command( Opcode::start_measurement ) ) );
     sample( 8 );
 
     ASSERT_EQ( sent_.size(), 1U );
@@ -258,7 +258,7 @@ TEST_F( ManagerTest, StartWhileMeasuringStartsANewTimeline )
     EXPECT_EQ( samples[0].timestamp_us, 5714U );
 }
 
-TEST_F( ManagerTest, TareSendsThePendingSamplesFirst )
+TEST_F( MeasurementTest, TareSendsThePendingSamplesFirst )
 {
     start_measuring();
     sample( 2 );
@@ -266,130 +266,130 @@ TEST_F( ManagerTest, TareSendsThePendingSamplesFirst )
     EXPECT_CALL( client_, send( _ ) );
     EXPECT_CALL( load_cell_, tare() ).WillOnce( Return( fw::Result<>{} ) );
 
-    EXPECT_TRUE( manager_.handle( command( Opcode::tare ) ) );
+    EXPECT_TRUE( measurement_.handle( command( Opcode::tare ) ) );
 }
 
-TEST_F( ManagerTest, TareReportsAFailure )
+TEST_F( MeasurementTest, TareReportsAFailure )
 {
     EXPECT_CALL( load_cell_, tare() ).WillOnce( Return( std::unexpected( std::errc::timed_out ) ) );
-    EXPECT_EQ( manager_.handle( command( Opcode::tare ) ), std::unexpected( std::errc::timed_out ) );
+    EXPECT_EQ( measurement_.handle( command( Opcode::tare ) ), std::unexpected( std::errc::timed_out ) );
 }
 
-TEST_F( ManagerTest, AddCalibrationPointPassesTheWeight )
+TEST_F( MeasurementTest, AddCalibrationPointPassesTheWeight )
 {
     EXPECT_CALL( load_cell_, add_calibration_point( 20.5F ) ).WillOnce( Return( fw::Result<std::size_t>{ 1 } ) );
-    EXPECT_TRUE( manager_.handle( command( Opcode::add_calibration_point, 20.5F ) ) );
+    EXPECT_TRUE( measurement_.handle( command( Opcode::add_calibration_point, 20.5F ) ) );
     EXPECT_TRUE( sent_.empty() ); // no response, as Crimpdeq
 }
 
-TEST_F( ManagerTest, AddCalibrationPointReportsAFailure )
+TEST_F( MeasurementTest, AddCalibrationPointReportsAFailure )
 {
     EXPECT_CALL( load_cell_, add_calibration_point( _ ) ).WillOnce( Return( std::unexpected( std::errc::no_buffer_space ) ) );
-    EXPECT_EQ( manager_.handle( command( Opcode::add_calibration_point, 1.0F ) ), std::unexpected( std::errc::no_buffer_space ) );
+    EXPECT_EQ( measurement_.handle( command( Opcode::add_calibration_point, 1.0F ) ), std::unexpected( std::errc::no_buffer_space ) );
 }
 
-TEST_F( ManagerTest, AnswersTheAppVersion )
+TEST_F( MeasurementTest, AnswersTheAppVersion )
 {
-    ASSERT_TRUE( manager_.handle( command( Opcode::get_app_version ) ) );
+    ASSERT_TRUE( measurement_.handle( command( Opcode::get_app_version ) ) );
     ASSERT_EQ( sent_.size(), 1U );
     EXPECT_EQ( sent_[0], ( std::vector<std::uint8_t>{ 0x00, 5, '2', '.', '0', '.', '4' } ) );
 }
 
-TEST_F( ManagerTest, AnswersTheProgressorIdLeastSignificantByteFirst )
+TEST_F( MeasurementTest, AnswersTheProgressorIdLeastSignificantByteFirst )
 {
-    ASSERT_TRUE( manager_.handle( command( Opcode::get_progressor_id ) ) );
+    ASSERT_TRUE( measurement_.handle( command( Opcode::get_progressor_id ) ) );
     ASSERT_EQ( sent_.size(), 1U );
     EXPECT_EQ( sent_[0], ( std::vector<std::uint8_t>{ 0x00, 6, 0xD5, 0x1B, 0x01, 0x17, 0x4E, 0x7E } ) );
 }
 
-TEST_F( ManagerTest, AnswersTheBatteryVoltage )
+TEST_F( MeasurementTest, AnswersTheBatteryVoltage )
 {
-    ASSERT_TRUE( manager_.handle( command( Opcode::sample_battery ) ) );
+    ASSERT_TRUE( measurement_.handle( command( Opcode::sample_battery ) ) );
     ASSERT_EQ( sent_.size(), 1U );
     EXPECT_EQ( sent_[0], ( std::vector<std::uint8_t>{ 0x00, 4, 0xA0, 0x0F, 0x00, 0x00 } ) ); // 4000 mV
 }
 
-TEST_F( ManagerTest, ShutdownStopsMeasuringAndDisconnects )
+TEST_F( MeasurementTest, ShutdownStopsMeasuringAndDisconnects )
 {
     start_measuring();
     sample( 2 );
     EXPECT_CALL( load_cell_, stop() ).WillOnce( Return( fw::Result<>{} ) );
     EXPECT_CALL( client_, disconnect() ).WillOnce( Return( fw::Result<>{} ) );
 
-    EXPECT_TRUE( manager_.handle( command( Opcode::shutdown ) ) );
-    EXPECT_FALSE( manager_.measuring() );
+    EXPECT_TRUE( measurement_.handle( command( Opcode::shutdown ) ) );
+    EXPECT_FALSE( measurement_.measuring() );
     EXPECT_TRUE( sent_.empty() );
 }
 
-TEST_F( ManagerTest, DisconnectionStopsMeasuringWithoutSending )
+TEST_F( MeasurementTest, DisconnectionStopsMeasuringWithoutSending )
 {
     start_measuring();
     sample( 2 );
     EXPECT_CALL( load_cell_, stop() ).WillOnce( Return( fw::Result<>{} ) );
 
-    EXPECT_TRUE( manager_.handle( connection( false ) ) );
-    EXPECT_FALSE( manager_.measuring() );
+    EXPECT_TRUE( measurement_.handle( connection( false ) ) );
+    EXPECT_FALSE( measurement_.measuring() );
     EXPECT_TRUE( sent_.empty() );
 }
 
-TEST_F( ManagerTest, ConnectionChangesNothing )
+TEST_F( MeasurementTest, ConnectionChangesNothing )
 {
     EXPECT_CALL( load_cell_, start( _ ) ).Times( 0 );
-    EXPECT_TRUE( manager_.handle( connection( true ) ) );
-    EXPECT_FALSE( manager_.measuring() );
+    EXPECT_TRUE( measurement_.handle( connection( true ) ) );
+    EXPECT_FALSE( measurement_.measuring() );
 }
 
-TEST_F( ManagerTest, DropsBatchesTheLinkHasNoRoomForAndKeepsMeasuring )
+TEST_F( MeasurementTest, DropsBatchesTheLinkHasNoRoomForAndKeepsMeasuring )
 {
     start_measuring( hal::SampleRate::sps20 );
     EXPECT_CALL( client_, send( _ ) ).WillOnce( Return( std::unexpected( std::errc::no_buffer_space ) ) ).WillRepeatedly( Return( fw::Result<>{} ) );
 
     sample( 3 );
 
-    EXPECT_EQ( manager_.dropped_batches(), 1U );
-    EXPECT_TRUE( manager_.measuring() );
+    EXPECT_EQ( measurement_.dropped_batches(), 1U );
+    EXPECT_TRUE( measurement_.measuring() );
 }
 
-TEST_F( ManagerTest, KeepsMeasuringWhenTheClientIsNotSubscribed )
+TEST_F( MeasurementTest, KeepsMeasuringWhenTheClientIsNotSubscribed )
 {
     start_measuring( hal::SampleRate::sps20 );
     ON_CALL( client_, send( _ ) ).WillByDefault( Return( std::unexpected( std::errc::not_connected ) ) );
 
     sample( 3 );
 
-    EXPECT_EQ( manager_.dropped_batches(), 0U );
-    EXPECT_TRUE( manager_.measuring() );
+    EXPECT_EQ( measurement_.dropped_batches(), 0U );
+    EXPECT_TRUE( measurement_.measuring() );
 }
 
-TEST_F( ManagerTest, AFailedReadIsRetried )
+TEST_F( MeasurementTest, AFailedReadIsRetried )
 {
     start_measuring();
     EXPECT_CALL( load_cell_, read( _ ) )
         .WillOnce( Return( std::unexpected( std::errc::resource_unavailable_try_again ) ) )
         .WillOnce( Return( fw::Result<load_cell_svc::ForceSample>{ { .kg = 1.0F, .timestamp_us = 1'000'000 } } ) );
 
-    EXPECT_EQ( manager_.sample(), std::unexpected( std::errc::resource_unavailable_try_again ) );
-    EXPECT_TRUE( manager_.sample() );
-    EXPECT_TRUE( manager_.measuring() );
+    EXPECT_EQ( measurement_.sample(), std::unexpected( std::errc::resource_unavailable_try_again ) );
+    EXPECT_TRUE( measurement_.sample() );
+    EXPECT_TRUE( measurement_.measuring() );
 }
 
-TEST_F( ManagerTest, RepeatedFailedReadsStopTheMeasurement )
+TEST_F( MeasurementTest, RepeatedFailedReadsStopTheMeasurement )
 {
     start_measuring();
     ON_CALL( load_cell_, read( _ ) ).WillByDefault( Return( std::unexpected( std::errc::resource_unavailable_try_again ) ) );
     EXPECT_CALL( load_cell_, stop() ).WillOnce( Return( fw::Result<>{} ) );
 
     for( unsigned i = 0; i < measurement_manager::max_read_failures; ++i ) {
-        EXPECT_FALSE( manager_.sample() );
+        EXPECT_FALSE( measurement_.sample() );
     }
-    EXPECT_FALSE( manager_.measuring() );
+    EXPECT_FALSE( measurement_.measuring() );
 }
 
-TEST_F( ManagerTest, ReadsWaitAtLeastTwoSamplePeriods )
+TEST_F( MeasurementTest, ReadsWaitAtLeastTwoSamplePeriods )
 {
     start_measuring( hal::SampleRate::sps20 );
     EXPECT_CALL( load_cell_, read( testing::Ge( std::chrono::microseconds{ 100'000 } ) ) );
-    (void)manager_.sample();
+    (void)measurement_.sample();
 }
 
 } // namespace

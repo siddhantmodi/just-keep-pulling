@@ -1,16 +1,16 @@
 /**
  * @file app_manager.cpp
  * @brief The app manager's plumbing: a zbus listener feeding its event queue, and
- *        the thread that hands queued events to app_manager::Manager.
+ *        the thread that hands queued events to app_manager::App.
  *
  * SPDX-License-Identifier: Apache-2.0
  */
 
 #include "app_manager.hpp"
 
+#include "app.hpp"
 #include "channels.hpp"
 #include "led_svc.hpp"
-#include "manager.hpp"
 
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
@@ -29,9 +29,9 @@ namespace
 {
 
 /** @brief The production manager, built on first use: its LED comes from another file, so it cannot be constinit. */
-app_manager::Manager &manager()
+app_manager::App &app()
 {
-    static app_manager::Manager instance{ led_svc::led() };
+    static app_manager::App instance{ led_svc::led() };
     return instance;
 }
 
@@ -64,7 +64,7 @@ void run( void * /*p1*/, void * /*p2*/, void * /*p3*/ )
         if( !event ) {
             continue;
         }
-        if( auto ret = manager().handle( *event ); !ret ) {
+        if( auto ret = app().handle( *event ); !ret ) {
             LOG_ERR( "event %u failed: %d", static_cast<unsigned>( event->type ), fw::err::to_zephyr( ret.error() ) );
         }
     }
@@ -85,7 +85,7 @@ namespace app_manager
 fw::Result<> start()
 {
     // Builds the manager here, before its thread runs.
-    if( auto ret = manager().start(); !ret ) {
+    if( auto ret = app().start(); !ret ) {
         return ret;
     }
     k_thread_start( app_manager_thread );

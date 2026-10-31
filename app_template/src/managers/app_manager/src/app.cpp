@@ -1,11 +1,11 @@
 /**
- * @file manager.cpp
- * @brief app_manager::Manager implementation.
+ * @file app.cpp
+ * @brief app_manager::App implementation.
  *
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include "manager.hpp"
+#include "app.hpp"
 
 #include <expected>
 #include <system_error>
@@ -13,12 +13,12 @@
 namespace app_manager
 {
 
-fw::Result<> Manager::start()
+fw::Result<> App::start()
 {
     return publish_led_state();
 }
 
-fw::Result<> Manager::handle( const Event &event )
+fw::Result<> App::handle( const Event &event )
 {
     switch( event.type ) {
     case Event::Type::led_request:
@@ -27,7 +27,7 @@ fw::Result<> Manager::handle( const Event &event )
     return std::unexpected( std::errc::invalid_argument );
 }
 
-fw::Result<> Manager::on_led_request( const channels::LedRequest &request )
+fw::Result<> App::on_led_request( const channels::LedRequest &request )
 {
     auto applied = led_.set( request.on );
     if( auto published = publish_led_state(); applied && !published ) {
@@ -36,7 +36,7 @@ fw::Result<> Manager::on_led_request( const channels::LedRequest &request )
     return applied;
 }
 
-fw::Result<> Manager::publish_led_state()
+fw::Result<> App::publish_led_state()
 {
     return channels::led_state.publish( { .on = led_.is_on() } );
 }

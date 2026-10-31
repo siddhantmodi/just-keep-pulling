@@ -14,7 +14,7 @@ classDiagram
     }
 
     namespace measurement_manager {
-        class Manager {
+        class Measurement {
             <<manager thread>>
             +start() Result
             +handle(Event) Result
@@ -191,7 +191,7 @@ classDiagram
     main ..> ILoadCell : load_cell()
     main ..> fw_settings : init
     main ..> Client : ble_svc init()
-    main ..> Manager : measurement_manager start()
+    main ..> Measurement : measurement_manager start()
     debug_shell ..> IIdentity
     debug_shell ..> ILoadCell : rate only
 
@@ -203,10 +203,10 @@ classDiagram
     LoadCell ..> ForceSample
     ILoadCellAdc ..> SampleRate
     ILoadCellAdc ..> LoadCellSample
-    Manager --> ILoadCell : load_cell_
-    Manager --> IClient : client_
-    Manager ..> progressor : encode responses and samples
-    Manager ..> Event
+    Measurement --> ILoadCell : load_cell_
+    Measurement --> IClient : client_
+    Measurement ..> progressor : encode responses and samples
+    Measurement ..> Event
     progressor_command ..> Event : listener, queue
     client_connection ..> Event : listener, queue
     Client ..> progressor : decode_command
@@ -226,6 +226,6 @@ Each component's production file binds the concrete types (see `docs/architectur
 | Accessor | Instance | Bound to |
 |---|---|---|
 | `identity_svc::identity()` | `Identity` | settings key `identity/id` |
-| `measurement_manager::start()` | `Manager` in `measurement_manager.cpp`, built on first use | `load_cell()`, `client()`, and the device ID as at boot; thread priority 2 |
+| `measurement_manager::start()` | `Measurement` in `measurement_manager.cpp`, built on first use | `load_cell()`, `client()`, and the device ID as at boot; thread priority 2 |
 | `ble_svc::client()` | `Client` in `ble_svc.cpp` | Bluetooth: the Progressor GATT service, advertising as `Progressor_NNNN` (NNNN from the device ID) |
 | `load_cell_svc::load_cell()` | `LoadCell` on `hal::zephyr::Ads1220` | devicetree alias `load-cell-adc`: the ADS1220 on the XIAO's SPI (`/CS` P1.00, `/DRDY` P1.31), or the emulated chip on native_sim |

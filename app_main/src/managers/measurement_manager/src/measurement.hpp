@@ -1,6 +1,6 @@
 /**
- * @file manager.hpp
- * @brief measurement_manager::Manager: the measurement manager's logic, with no thread of its own.
+ * @file measurement.hpp
+ * @brief measurement_manager::Measurement: the measurement manager's logic, with no thread of its own.
  *
  * The manager thread (measurement_manager.cpp) takes Events off its queue and
  * calls handle(); while measuring, it calls sample() between events. Tests
@@ -76,10 +76,10 @@ struct Event {
 
 static_assert( std::is_trivially_copyable_v<Event>, "events are copied through a k_msgq" );
 
-class Manager
+class Measurement
 {
 public:
-    constexpr Manager( load_cell_svc::ILoadCell &load_cell, ble_svc::IClient &client, const progressor::ProgressorId &id ) noexcept
+    constexpr Measurement( load_cell_svc::ILoadCell &load_cell, ble_svc::IClient &client, const progressor::ProgressorId &id ) noexcept
         : load_cell_{ load_cell }
         , client_{ client }
         , id_{ id }

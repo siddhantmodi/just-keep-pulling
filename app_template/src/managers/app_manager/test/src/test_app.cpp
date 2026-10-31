@@ -1,12 +1,12 @@
 /**
- * @file test_manager.cpp
- * @brief Unit tests for app_manager::Manager with a mocked LED and real zbus channels.
+ * @file test_app.cpp
+ * @brief Unit tests for app_manager::App with a mocked LED and real zbus channels.
  *
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include "app.hpp"
 #include "channels.hpp"
-#include "manager.hpp"
 #include "mock_led.hpp"
 
 #include <expected>
@@ -28,37 +28,37 @@ bool published_led_state()
     return state && state->on;
 }
 
-class ManagerTest : public ::testing::Test
+class AppTest : public ::testing::Test
 {
 protected:
     NiceMock<MockLed> led_;
-    app_manager::Manager manager_{ led_ };
+    app_manager::App app_{ led_ };
 };
 
-TEST_F( ManagerTest, StartPublishesCurrentLedState )
+TEST_F( AppTest, StartPublishesCurrentLedState )
 {
     ON_CALL( led_, is_on() ).WillByDefault( Return( true ) );
 
-    ASSERT_TRUE( manager_.start() );
+    ASSERT_TRUE( app_.start() );
     EXPECT_TRUE( published_led_state() );
 }
 
-TEST_F( ManagerTest, LedRequestDrivesLedAndPublishesState )
+TEST_F( AppTest, LedRequestDrivesLedAndPublishesState )
 {
     EXPECT_CALL( led_, set( true ) ).WillOnce( Return( fw::Result<>{} ) );
     ON_CALL( led_, is_on() ).WillByDefault( Return( true ) );
 
-    ASSERT_TRUE( manager_.handle( app_manager::Event::from( { .on = true } ) ) );
+    ASSERT_TRUE( app_.handle( app_manager::Event::from( { .on = true } ) ) );
     EXPECT_TRUE( published_led_state() );
 }
 
-TEST_F( ManagerTest, FailedLedRequestPublishesUnchangedState )
+TEST_F( AppTest, FailedLedRequestPublishesUnchangedState )
 {
     ASSERT_TRUE( channels::led_state.publish( { .on = true } ) ); // Something stale the manager must overwrite.
     EXPECT_CALL( led_, set( true ) ).WillOnce( Return( fw::Result<>{ std::unexpected( std::errc::io_error ) } ) );
     ON_CALL( led_, is_on() ).WillByDefault( Return( false ) );
 
-    auto ret = manager_.handle( app_manager::Event::from( { .on = true } ) );
+    auto ret = app_.handle( app_manager::Event::from( { .on = true } ) );
 
     ASSERT_FALSE( ret );
     EXPECT_EQ( ret.error(), std::errc::io_error );

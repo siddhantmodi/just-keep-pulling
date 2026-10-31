@@ -7,7 +7,7 @@ project(test_app_manager)
 
 target_compile_options(app PRIVATE -Werror)
 
-# The Manager class with a mocked LED (led_svc's MockLed) and the app's real
+# The App class with a mocked LED (led_svc's MockLed) and the app's real
 # zbus channels, so tests check what the manager publishes.
 target_include_directories(app PRIVATE
     ../inc
@@ -19,6 +19,6 @@ target_include_directories(app PRIVATE
 
 target_sources(app PRIVATE
     ../../../channels/src/channels.cpp
-    ../src/manager.cpp
-    src/test_manager.cpp
+    ../src/app.cpp
+    src/test_app.cpp
 )

@@ -1,6 +1,6 @@
 /**
- * @file manager.hpp
- * @brief app_manager::Manager: the app manager's logic, with no thread of its own.
+ * @file app.hpp
+ * @brief app_manager::App: the app manager's logic, with no thread of its own.
  *
  * The manager thread (app_manager.cpp) takes Events off its queue and calls
  * handle(); tests call it directly.
@@ -45,10 +45,10 @@ struct Event {
 
 static_assert( std::is_trivially_copyable_v<Event>, "events are copied through a k_msgq" );
 
-class Manager
+class App
 {
 public:
-    constexpr explicit Manager( led_svc::ILed &led ) noexcept
+    constexpr explicit App( led_svc::ILed &led ) noexcept
         : led_{ led }
     {
     }

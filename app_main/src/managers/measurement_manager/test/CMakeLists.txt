@@ -7,7 +7,7 @@ project(test_measurement_manager)
 
 target_compile_options(app PRIVATE -Werror)
 
-# The Manager class with a mocked load cell and client (each component's own
+# The Measurement class with a mocked load cell and client (each component's own
 # mock) and the real progressor encoding, so tests check the bytes sent.
 target_include_directories(app PRIVATE
     ../inc
@@ -23,6 +23,6 @@ target_include_directories(app PRIVATE
 target_sources(app PRIVATE
     ../../../channels/src/channels.cpp
     ../../../modules/progressor/src/progressor.cpp
-    ../src/manager.cpp
-    src/test_manager.cpp
+    ../src/measurement.cpp
+    src/test_measurement.cpp
 )

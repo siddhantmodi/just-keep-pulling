@@ -111,9 +111,19 @@ led_svc/
 1. **A component's public header holds its interface and an accessor** (`ILed &led()`).
 2. **Logic classes take interfaces in their constructors, never accessors.** That is what makes them testable with mocks.
 3. **Only the production file (`<component>.cpp`) uses accessors and binds hardware.** It is the one place where concrete types, devicetree aliases and other components meet. Zephyr's build-time macros (`K_THREAD_DEFINE`, `K_MUTEX_DEFINE`, `BT_GATT_SERVICE_DEFINE`, zbus listeners) also live in the production file that uses them, and are injected into logic classes by reference where needed (e.g. `temp_svc`'s read mutex).
-4. **Production instances are `constinit`** when their dependencies are in the same file, so there is no constructor ordering between files. An instance that needs another component's accessor is built on first use instead (a function-local static, e.g. `app_manager`'s `manager()`), before any thread that uses it starts.
+4. **Production instances are `constinit`** when their dependencies are in the same file, so there is no constructor ordering between files. An instance that needs another component's accessor is built on first use instead (a function-local static, e.g. `app_manager`'s `app()`), before any thread that uses it starts.
 5. **A component's mock ships with it** (`mocks/`), so every consumer's tests use the same one. HAL mocks live in `lib/hal/mocks`.
 6. **Logic classes are named for the thing they model**, not the component: the namespace already says which component (`led_svc::Led`, not `led_svc::LedService`).
+
+   **File names follow the component's stem.** A component is `<stem>_svc` or `<stem>_manager`. Its public header and production file take the component's name; its logic class and files, its mock and its test take the stem:
+
+   | Component | Public header, production file | Logic | Mock | Test |
+   |---|---|---|---|---|
+   | `load_cell_svc` | `load_cell_svc.hpp`, `load_cell_svc.cpp` | `LoadCell` in `load_cell.hpp/.cpp` | `mock_load_cell.hpp` | `test_load_cell.cpp` |
+   | `measurement_manager` | `measurement_manager.hpp`, `measurement_manager.cpp` | `Measurement` in `measurement.hpp/.cpp` | | `test_measurement.cpp` |
+
+   Other files are named for what they hold (`advertising.hpp`, `gatt_codec.hpp`), never for a generic role (`manager.cpp`, `impl.cpp`, `utils.hpp`), so a file name alone says where it belongs.
+
 7. **`docs/<app>.md` holds the app's class diagram** (Mermaid, rendered by GitHub): interfaces with their methods, implementations, modules, drivers and how they connect. A commit that adds a component or changes an interface updates it.
 
 Tests construct a fresh instance per test with mocks: no singleton reset, no link-time seam. A component test builds only the logic `.cpp` files and sources the component's `Kconfig` (for its log level). A HAL implementation is tested once in `lib/hal/test` against an emulator; components never test it again.

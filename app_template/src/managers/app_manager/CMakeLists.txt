@@ -3,6 +3,6 @@
 target_include_directories(app PRIVATE inc)
 
 target_sources(app PRIVATE
-    src/manager.cpp
+    src/app.cpp
     src/app_manager.cpp
 )

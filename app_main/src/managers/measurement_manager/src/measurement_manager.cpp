@@ -1,7 +1,7 @@
 /**
  * @file measurement_manager.cpp
  * @brief The measurement manager's plumbing: zbus listeners feeding its event
- *        queue, and the thread that hands events to measurement_manager::Manager
+ *        queue, and the thread that hands events to measurement_manager::Measurement
  *        and, while measuring, samples between them.
  *
  * SPDX-License-Identifier: Apache-2.0
@@ -13,7 +13,7 @@
 #include "channels.hpp"
 #include "identity_svc.hpp"
 #include "load_cell_svc.hpp"
-#include "manager.hpp"
+#include "measurement.hpp"
 
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
@@ -38,9 +38,9 @@ namespace
  *        from other files, so it cannot be constinit. Takes the device ID as
  *        it is at start(); a new ID applies from the next boot, as the name does.
  */
-measurement_manager::Manager &manager()
+measurement_manager::Measurement &measurement()
 {
-    static measurement_manager::Manager instance{ load_cell_svc::load_cell(), ble_svc::client(), identity_svc::identity().id() };
+    static measurement_manager::Measurement instance{ load_cell_svc::load_cell(), ble_svc::client(), identity_svc::identity().id() };
     return instance;
 }
 
@@ -75,16 +75,16 @@ void on_message( const zbus_channel *chan )
 void run( void * /*p1*/, void * /*p2*/, void * /*p3*/ )
 {
     while( true ) {
-        auto event = events.get( manager().measuring() ? K_NO_WAIT : K_FOREVER );
+        auto event = events.get( measurement().measuring() ? K_NO_WAIT : K_FOREVER );
         if( event ) {
-            if( auto ret = manager().handle( *event ); !ret ) {
+            if( auto ret = measurement().handle( *event ); !ret ) {
                 LOG_ERR( "event %u failed: %d", static_cast<unsigned>( event->type ), fw::err::to_zephyr( ret.error() ) );
             }
             continue;
         }
-        if( manager().measuring() ) {
+        if( measurement().measuring() ) {
             // Failures are logged by the manager, which stops measuring if they persist.
-            std::ignore = manager().sample();
+            std::ignore = measurement().sample();
         }
     }
 }
@@ -106,7 +106,7 @@ namespace measurement_manager
 fw::Result<> start()
 {
     // Builds the manager here, before its thread runs.
-    if( auto ret = manager().start(); !ret ) {
+    if( auto ret = measurement().start(); !ret ) {
         return ret;
     }
     k_thread_start( measurement_manager_thread );
