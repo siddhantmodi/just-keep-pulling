@@ -9,3 +9,6 @@ project(app_main)
 target_compile_options(app PRIVATE -Werror)
 
 target_sources(app PRIVATE src/main.cpp)
+
+# Modules: pure logic, no Zephyr
+add_subdirectory(src/modules/progressor)
