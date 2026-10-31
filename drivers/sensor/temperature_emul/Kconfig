@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: Apache-2.0
+
+config TEMPERATURE_EMUL
+	bool "Emulated temperature sensor"
+	default y
+	depends on DT_HAS_JKP_TEMPERATURE_EMUL_ENABLED
+	help
+	  Software temperature sensor for native_sim, reporting
+	  SENSOR_CHAN_DIE_TEMP through the regular sensor API. Tests set its
+	  value and inject errors with <jkp/drivers/temperature_emul.h>.

@@ -1,0 +1,2 @@
+# Devicetree vendor prefixes used by this repo's bindings.
+jkp	just-keep-pulling

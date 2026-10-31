@@ -1,6 +1,6 @@
 /**
  * @file test_led.cpp
- * @brief Unit tests for led_svc::Led with a mocked hal::DigitalOutput.
+ * @brief Unit tests for led_svc::Led with a mocked hal::IDigitalOutput.
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -27,7 +27,7 @@ class LedTest : public ::testing::Test
 {
 protected:
     NiceMock<MockDigitalOutput> output_;
-    led_svc::Led<NiceMock<MockDigitalOutput>> led_{ output_ };
+    led_svc::Led led_{ output_ };
 };
 
 TEST_F( LedTest, InitDrivesLedOff )
@@ -96,23 +96,10 @@ TEST_F( LedTest, SetFailureKeepsPreviousState )
     EXPECT_FALSE( led_.is_on() );
 }
 
-TEST_F( LedTest, ToggleAlternatesState )
-{
-    ASSERT_TRUE( led_.init() );
-    ::testing::InSequence seq;
-    EXPECT_CALL( output_, set( true ) );
-    EXPECT_CALL( output_, set( false ) );
-
-    ASSERT_TRUE( led_.toggle() );
-    EXPECT_TRUE( led_.is_on() );
-    ASSERT_TRUE( led_.toggle() );
-    EXPECT_FALSE( led_.is_on() );
-}
-
 TEST( LedStrictTest, InitOnlyConfiguresTheOutput )
 {
     StrictMock<MockDigitalOutput> output;
-    led_svc::Led<StrictMock<MockDigitalOutput>> led{ output };
+    led_svc::Led led{ output };
     EXPECT_CALL( output, init( false ) ).WillOnce( Return( fw::Result<>{} ) );
 
     EXPECT_TRUE( led.init() );

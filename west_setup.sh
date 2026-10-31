@@ -23,3 +23,8 @@ west packages pip --install --ignore-venv-check
 python3 -m pip install \
     -r "${TOPDIR}/deps/nrf/scripts/requirements.txt" \
     -r "${TOPDIR}/deps/bootloader/mcuboot/scripts/requirements.txt"
+
+# Integration tests: Bumble and this repo's pytest plugin (pylib/zephyr_bumble)
+python3 -m pip install \
+    -r "${PROJECT_DIR}/requirements-test.txt" \
+    -e "${PROJECT_DIR}/pylib/zephyr_bumble"

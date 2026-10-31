@@ -1,0 +1,8 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+
+/ {
+	temp_emul: temp-emul {
+		compatible = "jkp,temperature-emul";
+		millicelsius = <21500>;
+	};
+};

@@ -2,4 +2,5 @@
 #
 # Zephyr module Kconfig entry point (see zephyr/module.yml).
 
+rsource "drivers/Kconfig"
 rsource "lib/Kconfig"

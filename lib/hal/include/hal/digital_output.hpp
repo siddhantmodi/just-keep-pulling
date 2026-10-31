@@ -1,6 +1,6 @@
 /**
  * @file digital_output.hpp
- * @brief hal::DigitalOutput: the capability of driving a single output pin.
+ * @brief hal::IDigitalOutput: the capability of driving a single output pin.
  *
  * No Zephyr includes: logic that depends on this stays independent of the
  * hardware. Levels are logical ("active"), so active-low wiring is handled by
@@ -11,17 +11,22 @@
 
 #pragma once
 
-#include <concepts>
 #include <fw/error.hpp>
 
 namespace hal
 {
 
-template<typename T>
-concept DigitalOutput = requires( T &output, bool active ) {
-    /** Configure as an output driven to @p active. Fails with no_such_device if the controller is not ready. */
-    { output.init( active ) } -> std::same_as<fw::Result<>>;
-    { output.set( active ) } -> std::same_as<fw::Result<>>;
+class IDigitalOutput
+{
+public:
+    /** @brief Configure as an output driven to @p active. Fails with no_such_device if the controller is not ready. */
+    [[nodiscard]] virtual fw::Result<> init( bool active ) = 0;
+
+    [[nodiscard]] virtual fw::Result<> set( bool active ) = 0;
+
+protected:
+    // Never deleted through the interface: objects are static.
+    ~IDigitalOutput() = default;
 };
 
 } // namespace hal

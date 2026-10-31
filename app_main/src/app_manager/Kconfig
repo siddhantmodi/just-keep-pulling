@@ -1,0 +1,31 @@
+# SPDX-License-Identifier: Apache-2.0
+
+config APP_MANAGER
+	bool "App manager"
+	depends on ZBUS && APP_LED_SVC
+	help
+	  Thread that owns the app's services: applies requests from zbus
+	  (e.g. LED on/off from BLE) and publishes the resulting state.
+
+if APP_MANAGER
+
+config APP_MANAGER_STACK_SIZE
+	int "App manager thread stack size"
+	default 2048
+
+config APP_MANAGER_PRIORITY
+	int "App manager thread priority"
+	default 7
+
+config APP_MANAGER_QUEUE_DEPTH
+	int "App manager event queue depth"
+	default 8
+	help
+	  Events waiting for the manager thread. When full, new events are
+	  dropped (and counted) rather than blocking the publisher.
+
+module = APP_MANAGER
+module-str = app_manager
+source "subsys/logging/Kconfig.template.log_config"
+
+endif # APP_MANAGER

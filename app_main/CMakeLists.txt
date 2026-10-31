@@ -10,4 +10,8 @@ target_compile_options(app PRIVATE -Werror)
 
 target_sources(app PRIVATE src/main.cpp)
 
+add_subdirectory_ifdef(CONFIG_ZBUS src/channels)
 add_subdirectory_ifdef(CONFIG_APP_LED_SVC src/led_svc)
+add_subdirectory_ifdef(CONFIG_APP_TEMP_SVC src/temp_svc)
+add_subdirectory_ifdef(CONFIG_APP_MANAGER src/app_manager)
+add_subdirectory_ifdef(CONFIG_APP_BLE_SVC src/ble_svc)

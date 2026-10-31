@@ -1,0 +1,9 @@
+# SPDX-License-Identifier: Apache-2.0
+
+menu "just-keep-pulling drivers"
+
+if SENSOR
+rsource "sensor/Kconfig"
+endif
+
+endmenu

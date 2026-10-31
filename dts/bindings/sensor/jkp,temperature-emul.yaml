@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: Apache-2.0
+
+description: |
+  Emulated temperature sensor for native_sim. Reports SENSOR_CHAN_DIE_TEMP
+  through the Zephyr sensor API, so apps use the same code as on hardware.
+  Tests change the value or inject errors with <jkp/drivers/temperature_emul.h>.
+
+compatible: "jkp,temperature-emul"
+
+include: sensor-device.yaml
+
+properties:
+  millicelsius:
+    type: int
+    default: 25000
+    description: Initial temperature in milli-degrees Celsius.

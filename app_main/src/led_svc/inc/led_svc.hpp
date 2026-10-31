@@ -1,8 +1,8 @@
 /**
  * @file led_svc.hpp
- * @brief LED service public API: drives the board's led0.
+ * @brief LED service public API: the ILed interface and the app's LED.
  *
- * Not thread-safe: call from a single thread (the app's manager thread).
+ * Not thread-safe: call from a single thread (the app manager).
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -14,16 +14,24 @@
 namespace led_svc
 {
 
-/** @brief Configure the LED GPIO and turn the LED off. */
-[[nodiscard]] fw::Result<> init();
+class ILed
+{
+public:
+    /** @brief Configure the LED and turn it off. */
+    [[nodiscard]] virtual fw::Result<> init() = 0;
 
-/** @brief Turn the LED on or off. Fails with operation_not_permitted before init(). */
-[[nodiscard]] fw::Result<> set( bool on );
+    /** @brief Turn the LED on or off. Fails with operation_not_permitted before init(). */
+    [[nodiscard]] virtual fw::Result<> set( bool on ) = 0;
 
-/** @brief Invert the LED state. */
-[[nodiscard]] fw::Result<> toggle();
+    /** @brief Last state successfully applied to the LED. */
+    [[nodiscard]] virtual bool is_on() const = 0;
 
-/** @brief Last state successfully applied to the LED. */
-[[nodiscard]] bool is_on();
+protected:
+    // Never deleted through the interface: objects are static.
+    ~ILed() = default;
+};
+
+/** @brief The app's LED (devicetree alias led0). */
+[[nodiscard]] ILed &led();
 
 } // namespace led_svc

@@ -1,0 +1,13 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+
+/* native_sim has no die temperature sensor; use the repo's emulated one. */
+/ {
+	aliases {
+		die-temp = &die_temp_emul;
+	};
+
+	die_temp_emul: die-temp-emul {
+		compatible = "jkp,temperature-emul";
+		millicelsius = <25370>;
+	};
+};

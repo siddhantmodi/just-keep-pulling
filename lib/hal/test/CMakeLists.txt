@@ -7,4 +7,7 @@ project(test_hal)
 
 target_compile_options(app PRIVATE -Werror)
 
-target_sources(app PRIVATE src/test_gpio_output.cpp)
+target_sources(app PRIVATE
+    src/test_gpio_output.cpp
+    src/test_sensor_temperature.cpp
+)

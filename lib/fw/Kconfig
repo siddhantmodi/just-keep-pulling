@@ -6,4 +6,5 @@ config FW_CPP
 	default y
 	help
 	  Header-only C++23 helpers under <fw/...>: the fw::Result error
-	  model and Zephyr error-code conversions.
+	  model and Zephyr error-code conversions, and fw::ChannelRef (typed
+	  zbus channels, needs CONFIG_ZBUS).

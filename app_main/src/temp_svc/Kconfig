@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: Apache-2.0
+
+config APP_TEMP_SVC
+	bool "Temperature service"
+	depends on SENSOR && FW_HAL
+	depends on $(dt_alias_enabled,die-temp)
+	help
+	  Reads the die temperature from the sensor at the board's die-temp
+	  alias.
+
+# Outside "if APP_TEMP_SVC" so the unit test (which builds DieTemperature
+# without the production instance) gets the log level too.
+module = APP_TEMP_SVC
+module-str = temp_svc
+source "subsys/logging/Kconfig.template.log_config"

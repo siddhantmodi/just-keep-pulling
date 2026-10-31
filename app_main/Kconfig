@@ -11,5 +11,8 @@ source "subsys/logging/Kconfig.template.log_config"
 menu "Application components"
 
 rsource "src/led_svc/Kconfig"
+rsource "src/temp_svc/Kconfig"
+rsource "src/app_manager/Kconfig"
+rsource "src/ble_svc/Kconfig"
 
 endmenu

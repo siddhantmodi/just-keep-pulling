@@ -1,8 +1,7 @@
 /**
  * @file mock_digital_output.hpp
- * @brief hal::mocks::MockDigitalOutput: GoogleMock of hal::DigitalOutput, for
- *        injecting into components under test. Only on the include path when
- *        CONFIG_GTEST=y.
+ * @brief hal::mocks::MockDigitalOutput: GoogleMock of hal::IDigitalOutput.
+ *        Only on the include path when CONFIG_GTEST=y.
  *
  * Unconfigured calls return success (a default-constructed fw::Result<>).
  *
@@ -18,12 +17,11 @@
 namespace hal::mocks
 {
 
-struct MockDigitalOutput {
-    MOCK_METHOD( fw::Result<>, init, ( bool active ) );
-    MOCK_METHOD( fw::Result<>, set, ( bool active ) );
+class MockDigitalOutput : public IDigitalOutput
+{
+public:
+    MOCK_METHOD( fw::Result<>, init, ( bool active ), ( override ) );
+    MOCK_METHOD( fw::Result<>, set, ( bool active ), ( override ) );
 };
-
-static_assert( DigitalOutput<::testing::NiceMock<MockDigitalOutput>> );
-static_assert( DigitalOutput<::testing::StrictMock<MockDigitalOutput>> );
 
 } // namespace hal::mocks

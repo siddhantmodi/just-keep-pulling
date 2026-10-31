@@ -79,6 +79,40 @@ jobs:
           name: unit-test-coverage
           path: twister-unit/coverage/
 
+  integration:
+    name: Integration tests (Bumble / native_sim)
+    needs: [unit]
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/siddhantmodi/zephyr-dev-nordic:zsdk_v1.0.1
+      options: --user root
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: ./.github/actions/setup-west
+
+      - name: Run integration tests
+        run: |
+          west twister \
+            -T . \
+            -p "$NATIVE_BOARD" \
+            --tag integration \
+            --inline-logs \
+            -v \
+            --outdir twister-integration
+
+      - name: Upload test results and app logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: integration-test-results
+          path: |
+            twister-integration/twister.xml
+            twister-integration/twister.json
+            twister-integration/twister.log
+            twister-integration/**/handler.log
+            twister-integration/**/report.xml
+
   tidy:
     name: clang-tidy (${{ matrix.app }})
     runs-on: ubuntu-latest
@@ -99,7 +133,7 @@ jobs:
 
   build:
     name: Build ${{ matrix.app }} (${{ matrix.board }})
-    needs: [format, unit, tidy]
+    needs: [format, unit, integration, tidy]
     runs-on: ubuntu-latest
     container:
       image: ghcr.io/siddhantmodi/zephyr-dev-nordic:zsdk_v1.0.1

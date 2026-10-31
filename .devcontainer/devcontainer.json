@@ -75,7 +75,6 @@
             },
             "extensions": [
                 "mcu-debug.debug-tracker-vscode",
-                "ms-vscode.vscode-embedded-tools",
                 "ms-vscode.cpptools",
                 "mcu-debug.mcu-debug",
                 "wayou.vscode-todo-highlight",

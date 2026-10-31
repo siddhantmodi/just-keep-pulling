@@ -1,6 +1,6 @@
 /**
  * @file gpio_output.hpp
- * @brief hal::zephyr::GpioOutput: hal::DigitalOutput over the Zephyr GPIO API.
+ * @brief hal::zephyr::GpioOutput: hal::IDigitalOutput over the Zephyr GPIO API.
  *
  * Constructed from a devicetree spec, so the app (not the HAL) decides which
  * pin is used. The spec carries no direction: whichever pin is passed in is
@@ -24,7 +24,7 @@
 namespace hal::zephyr
 {
 
-class GpioOutput
+class GpioOutput final : public IDigitalOutput
 {
 public:
     constexpr explicit GpioOutput( gpio_dt_spec spec ) noexcept
@@ -32,7 +32,7 @@ public:
     {
     }
 
-    [[nodiscard]] fw::Result<> init( bool active )
+    [[nodiscard]] fw::Result<> init( bool active ) override
     {
         if( !gpio_is_ready_dt( &spec_ ) ) {
             return std::unexpected( std::errc::no_such_device );
@@ -40,7 +40,7 @@ public:
         return fw::err::check( gpio_pin_configure_dt( &spec_, active ? GPIO_OUTPUT_ACTIVE : GPIO_OUTPUT_INACTIVE ) );
     }
 
-    [[nodiscard]] fw::Result<> set( bool active )
+    [[nodiscard]] fw::Result<> set( bool active ) override
     {
         return fw::err::check( gpio_pin_set_dt( &spec_, active ? 1 : 0 ) );
     }
@@ -48,7 +48,5 @@ public:
 private:
     gpio_dt_spec spec_;
 };
-
-static_assert( DigitalOutput<GpioOutput> );
 
 } // namespace hal::zephyr
