@@ -65,18 +65,21 @@ In `lib/hal`, **the folder is the role and the file is named after the one type 
 
 - **Interfaces are named for the capability** (`I` prefix; the file drops it). Implementations are named for the Zephyr API behind them.
 - **Input and output stay separate types**, even though both are built from a `gpio_dt_spec`. A pin that must be both (open-drain, 1-wire) gets its own type implementing both interfaces.
-- **`scripts/check_layering.sh` enforces the Zephyr boundary.** It runs in CI and fails if an interface header includes Zephyr.
+- **`scripts/check_layering.sh` enforces the Zephyr boundary.** It runs in CI and fails if an interface header includes Zephyr (it also checks the app layering below).
 - **Pin direction is chosen where the app creates the object.** A `gpio_dt_spec` carries no direction, so `GpioOutput` configures whatever pin it is given as an output. Nothing in Zephyr or the HAL can catch a button pin passed to an output. Review the `GPIO_DT_SPEC_GET( ... )` line: the devicetree alias (`led0`, `sw0`) is where the intent is visible.
 
-Within an app, components follow the layering proven in cho03:
+Within an app, components follow the layering proven in cho03, one folder per layer under `app_<name>/src/`:
 
-- **Managers** own a thread and an event queue, and are the only callers of single-threaded services.
-- **Services** wrap one subsystem or peripheral and have no thread of their own.
-- **Modules** are pure logic with no Zephyr dependencies beyond `lib/fw`.
+- **`managers/`** own a thread and an event queue, and are the only callers of single-threaded services.
+- **`services/`** wrap one subsystem or peripheral and have no thread of their own.
+- **`modules/`** are pure logic with no Zephyr dependencies beyond `lib/fw`.
+- **`channels/`** holds the app's zbus channels: the message contracts shared by every layer.
+
+Dependencies point down: managers → services → modules. `scripts/check_layering.sh` fails CI if a service or module includes a manager's header, or a module includes a service's header or Zephyr. A component that more than one app needs moves out of `app_main` to a repo-level folder shared by all apps once a second app actually needs it.
 
 ### Managers and zbus
 
-A manager has its own event queue (`fw::QueueRef<Event>` over a `k_msgq`). A zbus **listener** on each channel the manager cares about copies the message into the queue and returns. The manager thread takes events off the queue and calls its logic's `handle(const Event &)`, which is what tests call. `app_main/src/app_manager/` is the reference.
+A manager has its own event queue (`fw::QueueRef<Event>` over a `k_msgq`). A zbus **listener** on each channel the manager cares about copies the message into the queue and returns. The manager thread takes events off the queue and calls its logic's `handle(const Event &)`, which is what tests call. `app_main/src/managers/app_manager/` is the reference.
 
 - **Every event is handled, in order**, with no allocation: the queue has fixed storage.
 - **One queue for everything.** Timer expiries and interrupts post events to the same queue, without zbus channels of their own.
@@ -94,7 +97,7 @@ Which zbus mechanism to use:
 
 ## Component pattern
 
-`app_main/src/led_svc/` is the reference:
+`app_main/src/services/led_svc/` is the reference:
 
 ```
 led_svc/

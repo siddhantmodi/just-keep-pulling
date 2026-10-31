@@ -4,7 +4,7 @@ Zephyr RTOS based firmware for a dynamometer for measuring finger strength for r
 
 Built on the nRF Connect SDK (NCS) for the nRF54L15 DK, in C++23, with GoogleTest unit tests and Bumble BLE integration tests that run on `native_sim`.
 
-The template app, `app_main`, exposes a custom BLE GATT service (advertised as "Just Keep Pulling"): an LED characteristic (read/write, `uint8` 0/1) and the die temperature (read, `int16` little-endian, hundredths of a degree Celsius). The service is open: no pairing is required. See `app_main/src/ble_svc/inc/ble_svc.hpp` for the UUIDs.
+The template app, `app_main`, exposes a custom BLE GATT service (advertised as "Just Keep Pulling"): an LED characteristic (read/write, `uint8` 0/1) and the die temperature (read, `int16` little-endian, hundredths of a degree Celsius). The service is open: no pairing is required. See `app_main/src/services/ble_svc/inc/ble_svc.hpp` for the UUIDs.
 
 ## Repository layout
 
@@ -22,10 +22,15 @@ docs/architecture.md  Design rules, layers, why C++, and when to revisit them
 app_main/             The main firmware application
   boards/             Devicetree overlays per board (aliases led0, die-temp)
   src/main.cpp
-  src/<component>/    One folder per component:
-    inc/              Public API
-    src/              Implementation
-    test/             GoogleTest unit test (its own small native_sim app)
+  src/channels/       zbus channels: the message contracts shared by every layer
+  src/managers/       Own a thread and an event queue (app_manager)
+  src/services/       One subsystem or peripheral each (led_svc, temp_svc, ble_svc)
+  src/modules/        Pure logic, no Zephyr (none yet)
+    <component>/      Each component:
+      inc/            Public API
+      src/            Implementation
+      mocks/          GoogleMock of its interface, for consumers' tests
+      test/           GoogleTest unit test (its own small native_sim app)
   integration/        pytest + Bumble tests of the whole app over BLE (app_main/testcase.yaml)
 pylib/zephyr_bumble/  Reusable pytest plugin: Bumble virtual central for native_sim BLE apps
 requirements-test.txt Python dependencies of the integration tests (installed by west_setup.sh)
@@ -41,9 +46,9 @@ The west workspace topdir is the **parent** of this repo; dependencies live in `
 
 - **Errors:** anything that can fail returns `fw::Result<T>` (`std::expected<T, std::errc>`). Zephyr return codes are converted with `fw::err::check()` / `fw::err::from_zephyr()`.
 - **C++:** C++23, no exceptions, no RTTI.
-- **Interfaces at every layer:** a component's public header holds an interface (`led_svc::ILed`) and an accessor to its production instance (`led_svc::led()`). Logic classes take interfaces in their constructors (hardware ones from `lib/hal`, e.g. `hal::IDigitalOutput`), so unit tests inject GoogleMocks; each component's production file binds the real hardware (`hal::zephyr::GpioOutput` on `led0`). See `app_main/src/led_svc/`.
+- **Interfaces at every layer:** a component's public header holds an interface (`led_svc::ILed`) and an accessor to its production instance (`led_svc::led()`). Logic classes take interfaces in their constructors (hardware ones from `lib/hal`, e.g. `hal::IDigitalOutput`), so unit tests inject GoogleMocks; each component's production file binds the real hardware (`hal::zephyr::GpioOutput` on `led0`). See `app_main/src/services/led_svc/`.
 - **Kernel, zbus, settings:** used for real in unit tests (the tests run on `native_sim`), wrapped only where it removes C boilerplate. See [docs/architecture.md](docs/architecture.md) for the rules.
-- **Managers and zbus:** a manager thread is the only caller of single-threaded services. zbus listeners copy messages into its event queue (see `app_main/src/app_manager/` and [docs/architecture.md](docs/architecture.md)).
+- **Managers and zbus:** a manager thread is the only caller of single-threaded services. zbus listeners copy messages into its event queue (see `app_main/src/managers/app_manager/` and [docs/architecture.md](docs/architecture.md)).
 - **Unit tests:** GoogleTest, built for `native_sim` and run by Twister (`harness: gtest`). A test's `prj.conf` sets `CONFIG_GTEST=y`; tests are tagged `unit`.
 - **Integration tests:** the real app on `native_sim`, driven over BLE by a Bumble virtual central (`harness: pytest`, `pylib/zephyr_bumble`); tagged `integration`.
 
@@ -72,7 +77,7 @@ west twister -T . -p native_sim/native/64 --tag integration --inline-logs
 # Formatting (--fix to reformat in place)
 scripts/check_format.sh
 
-# Include rules (HAL interface headers must not include Zephyr)
+# Include rules (HAL interface headers are Zephyr-free; managers -> services -> modules)
 scripts/check_layering.sh
 
 # clang-tidy: builds app_main for native_sim with clang, then analyzes production sources

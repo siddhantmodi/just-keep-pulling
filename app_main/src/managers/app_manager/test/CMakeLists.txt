@@ -12,13 +12,13 @@ target_compile_options(app PRIVATE -Werror)
 target_include_directories(app PRIVATE
     ../inc
     ../src
-    ../../channels/inc
-    ../../led_svc/inc
-    ../../led_svc/mocks
+    ../../../channels/inc
+    ../../../services/led_svc/inc
+    ../../../services/led_svc/mocks
 )
 
 target_sources(app PRIVATE
-    ../../channels/src/channels.cpp
+    ../../../channels/src/channels.cpp
     ../src/manager.cpp
     src/test_manager.cpp
 )
