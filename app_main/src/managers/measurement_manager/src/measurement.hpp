@@ -46,12 +46,14 @@ struct Event {
     enum class Type : std::uint8_t {
         command,
         client_connection,
+        config_command,
     };
 
     Type type;
     union {
         progressor::Command command;
         channels::ClientConnection client_connection;
+        channels::ConfigCommand config_command;
     };
 
     [[nodiscard]] static Event from( const progressor::Command &command ) noexcept
@@ -69,6 +71,14 @@ struct Event {
         event.client_connection = connection;
         return event;
     }
+
+    [[nodiscard]] static Event from( const channels::ConfigCommand &command ) noexcept
+    {
+        Event event{};
+        event.type = Type::config_command;
+        event.config_command = command;
+        return event;
+    }
 };
 
 static_assert( std::is_trivially_copyable_v<Event>, "events are copied through a k_msgq" );
@@ -83,7 +93,10 @@ public:
     {
     }
 
-    /** @brief Zero the scale, as Crimpdeq does at boot, so readings start near 0 kg before the client tares. */
+    /**
+     * @brief Zero the scale, as Crimpdeq does at boot, so readings start near 0 kg
+     *        before the client tares, and publish the calibration state.
+     */
     [[nodiscard]] fw::Result<> start();
 
     [[nodiscard]] fw::Result<> handle( const Event &event );
@@ -112,6 +125,10 @@ public:
 private:
     fw::Result<> on_command( const progressor::Command &command );
     fw::Result<> on_client_connection( const channels::ClientConnection &connection );
+    /** @brief Calibrate or set the sample rate, publishing the calibration state as it goes. */
+    fw::Result<> on_config_command( const channels::ConfigCommand &command );
+    fw::Result<> add_calibration_point( float kg );
+    void publish_calibration( channels::CalibrationStatus status ) const;
     fw::Result<> start_measurement();
     /** @brief Stop sampling; send the pending samples first if @p send_pending. */
     fw::Result<> stop_measurement( bool send_pending );
@@ -135,6 +152,7 @@ private:
     std::size_t batch_size_{ 0 };
     std::size_t batch_capacity_{ 1 };
     unsigned read_failures_{ 0 };
+    std::uint8_t calibration_points_{ 0 }; // the load cell's, which are in RAM only
     std::uint32_t dropped_batches_{ 0 };
 };
 

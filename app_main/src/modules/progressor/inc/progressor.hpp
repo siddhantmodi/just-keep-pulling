@@ -9,10 +9,11 @@
  * little-endian.
  *
  * Covers Tindeq's public API (tare, start/stop measurement, shutdown, battery
- * voltage) plus the commands Crimpdeq answers because the Tindeq app uses
- * them (app version, Progressor ID) and Crimpdeq's add-calibration-point.
- * Anything else, e.g. the undocumented peak-RFD commands, decodes as
- * not_supported.
+ * voltage) plus the two commands the Tindeq app uses to identify a device
+ * (app version, Progressor ID). Anything else decodes as not_supported: the
+ * undocumented peak-RFD commands, and the real Progressor's calibration
+ * commands (0x69-0x6A, 0x71-0x76), which work differently from ours.
+ * Calibration is in ble_svc's JustKeepPulling service instead.
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -33,7 +34,6 @@ enum class Opcode : std::uint8_t {
     tare = 0x64,
     start_measurement = 0x65,
     stop_measurement = 0x66,
-    add_calibration_point = 0x69, // Crimpdeq's; weight in kg as f32
     get_app_version = 0x6B,
     shutdown = 0x6E,
     sample_battery = 0x6F,
@@ -48,7 +48,6 @@ enum class ResponseCode : std::uint8_t {
 
 struct Command {
     Opcode opcode;
-    float calibration_kg; // add_calibration_point only
 };
 
 /** @brief One weight sample: kilograms, and microseconds since the measurement started. */
@@ -94,13 +93,11 @@ struct Packet {
 /**
  * @brief Decode a control point write.
  *
- * Commands without a payload are accepted with or without a length byte, and
- * trailing bytes are ignored, as Crimpdeq does. add_calibration_point takes a
- * finite, non-negative f32, either right after the opcode (as written by hand
- * in nRF Connect) or after a length byte of 4.
+ * No command takes a payload: a length byte and any trailing bytes are
+ * ignored, as Crimpdeq does.
  *
  * Fails with not_supported for an unknown opcode and invalid_argument for an
- * empty write or a malformed payload.
+ * empty write.
  */
 [[nodiscard]] fw::Result<Command> decode_command( std::span<const std::uint8_t> bytes ) noexcept;
 

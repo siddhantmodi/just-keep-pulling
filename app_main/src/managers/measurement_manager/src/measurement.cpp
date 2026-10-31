@@ -47,6 +47,7 @@ fw::Result<> Measurement::start()
     if( auto ret = load_cell_.tare(); !ret ) {
         LOG_WRN( "starting untared" );
     }
+    publish_calibration( channels::CalibrationStatus::ok );
     return {};
 }
 
@@ -57,6 +58,8 @@ fw::Result<> Measurement::handle( const Event &event )
         return on_command( event.command );
     case Event::Type::client_connection:
         return on_client_connection( event.client_connection );
+    case Event::Type::config_command:
+        return on_config_command( event.config_command );
     }
     return std::unexpected( std::errc::invalid_argument );
 }
@@ -74,15 +77,6 @@ fw::Result<> Measurement::on_command( const progressor::Command &command )
         return start_measurement();
     case Opcode::stop_measurement:
         return stop_measurement( true );
-    case Opcode::add_calibration_point:
-    {
-        send_batch();
-        auto points = load_cell_.add_calibration_point( command.calibration_kg );
-        if( !points ) {
-            return std::unexpected( points.error() );
-        }
-        return {};
-    }
     case Opcode::get_app_version:
         return reply( progressor::encode_app_version( app_version ) );
     case Opcode::shutdown:
@@ -114,6 +108,73 @@ fw::Result<> Measurement::on_client_connection( const channels::ClientConnection
         return stop_measurement( false );
     }
     return {};
+}
+
+fw::Result<> Measurement::on_config_command( const channels::ConfigCommand &command )
+{
+    using Type = channels::ConfigCommand::Type;
+
+    switch( command.type ) {
+    case Type::add_calibration_point:
+        return add_calibration_point( command.calibration_kg );
+    case Type::reset_calibration:
+    {
+        calibration_points_ = 0;
+        auto ret = load_cell_.reset_calibration();
+        LOG_INF( "calibration reset to the default factor" );
+        publish_calibration( ret ? channels::CalibrationStatus::ok : channels::CalibrationStatus::failed );
+        return ret;
+    }
+    case Type::set_sample_rate:
+    {
+        auto rate = hal::to_sample_rate( command.samples_per_second );
+        if( !rate ) {
+            return std::unexpected( rate.error() );
+        }
+        return load_cell_.set_sample_rate( *rate );
+    }
+    }
+    return std::unexpected( std::errc::invalid_argument );
+}
+
+fw::Result<> Measurement::add_calibration_point( float kg )
+{
+    // Tell the client it takes a while, and send the pending samples: the
+    // measurement pauses while the point is averaged.
+    publish_calibration( channels::CalibrationStatus::measuring );
+    send_batch();
+
+    auto points = load_cell_.add_calibration_point( kg );
+    if( points ) {
+        calibration_points_ = static_cast<std::uint8_t>( *points );
+        publish_calibration( channels::CalibrationStatus::ok );
+        return {};
+    }
+
+    channels::CalibrationStatus status = channels::CalibrationStatus::failed;
+    switch( points.error() ) {
+    case std::errc::no_buffer_space:
+        status = channels::CalibrationStatus::full;
+        break;
+    case std::errc::result_out_of_range: // an implausible factor
+    case std::errc::invalid_argument:    // no line through the points
+        // The load cell cleared its points and kept the factor.
+        calibration_points_ = 0;
+        status = channels::CalibrationStatus::fit_rejected;
+        break;
+    default:
+        break;
+    }
+    publish_calibration( status );
+    return std::unexpected( points.error() );
+}
+
+void Measurement::publish_calibration( channels::CalibrationStatus status ) const
+{
+    channels::CalibrationState const state{ .status = status, .points = calibration_points_, .factor_g_per_code = load_cell_.calibration_factor() };
+    if( auto ret = channels::calibration_state.publish( state ); !ret ) {
+        LOG_ERR( "calibration state publish failed: %d", fw::err::to_zephyr( ret.error() ) );
+    }
 }
 
 fw::Result<> Measurement::start_measurement()

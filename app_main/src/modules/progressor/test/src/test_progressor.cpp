@@ -63,46 +63,12 @@ TEST( DecodeCommandTest, RejectsEmptyWrite )
 
 TEST( DecodeCommandTest, ReportsUnknownOpcodesAsNotSupported )
 {
-    // 0x67/0x68 are the undocumented peak-RFD commands; 0x00 is not a command at all.
-    for( std::uint8_t const opcode : { 0x00, 0x67, 0x68, 0x6A, 0x72, 0xFF } ) {
+    // 0x67/0x68 are the undocumented peak-RFD commands; 0x69-0x6A and 0x71-0x76 the
+    // real Progressor's (and Crimpdeq's) calibration commands; 0x00 is not a command at all.
+    for( std::uint8_t const opcode : { 0x00, 0x67, 0x68, 0x69, 0x6A, 0x71, 0x72, 0x75, 0xFF } ) {
         std::array<std::uint8_t, 1> const write{ opcode };
 
         EXPECT_EQ( progressor::decode_command( write ).error(), std::errc::not_supported ) << "opcode " << static_cast<int>( opcode );
-    }
-}
-
-TEST( DecodeCommandTest, DecodesCalibrationWeightRightAfterOpcode )
-{
-    // 1.5 kg = 0x3FC00000
-    std::array<std::uint8_t, 5> const write{ 0x69, 0x00, 0x00, 0xC0, 0x3F };
-
-    auto command = progressor::decode_command( write );
-
-    ASSERT_TRUE( command );
-    EXPECT_EQ( command->opcode, Opcode::add_calibration_point );
-    EXPECT_FLOAT_EQ( command->calibration_kg, 1.5F );
-}
-
-TEST( DecodeCommandTest, DecodesCalibrationWeightAfterLengthByte )
-{
-    std::array<std::uint8_t, 6> const write{ 0x69, 0x04, 0x00, 0x00, 0xC0, 0x3F };
-
-    auto command = progressor::decode_command( write );
-
-    ASSERT_TRUE( command );
-    EXPECT_FLOAT_EQ( command->calibration_kg, 1.5F );
-}
-
-TEST( DecodeCommandTest, RejectsMalformedCalibrationWeight )
-{
-    std::array<std::uint8_t, 4> const too_short{ 0x69, 0x00, 0xC0, 0x3F };
-    std::array<std::uint8_t, 5> const negative{ 0x69, 0x00, 0x00, 0xC0, 0xBF };     // -1.5
-    std::array<std::uint8_t, 5> const not_a_number{ 0x69, 0x00, 0x00, 0xC0, 0x7F }; // NaN
-    std::array<std::uint8_t, 5> const infinite{ 0x69, 0x00, 0x00, 0x80, 0x7F };     // +inf
-
-    for( std::span<const std::uint8_t> const write : { std::span<const std::uint8_t>{ too_short }, std::span<const std::uint8_t>{ negative },
-                                                       std::span<const std::uint8_t>{ not_a_number }, std::span<const std::uint8_t>{ infinite } } ) {
-        EXPECT_EQ( progressor::decode_command( write ).error(), std::errc::invalid_argument );
     }
 }
 

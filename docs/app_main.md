@@ -26,6 +26,7 @@ classDiagram
             <<tagged union>>
             command: progressor::Command
             client_connection: ClientConnection
+            config_command: ConfigCommand
         }
     }
 
@@ -48,6 +49,7 @@ classDiagram
         class Activity {
             <<manager thread: inactivity>>
             +on_command(Opcode)
+            +on_configuration()
             +on_client_connection(bool)
             +on_measurement(bool)
             +check() Result
@@ -127,6 +129,26 @@ classDiagram
         }
     }
 
+    namespace jkp_svc {
+        class JkpService {
+            <<GATT service, static>>
+            JustKeepPulling service a6bd0001
+            calibration a6bd0002: read, notify
+            add calibration point a6bd0003: write kg
+            reset calibration a6bd0004: write 0x01
+            sample rate a6bd0005: read, write
+            device ID a6bd0006: read
+        }
+        class jkp_protocol {
+            <<pure>>
+            encode_calibration(status, points, factor) bytes
+            decode_calibration_kg(bytes) Result~float~
+            decode_reset_calibration(bytes) Result
+            encode_sample_rate(SampleRate) bytes
+            decode_sample_rate(bytes) Result~SampleRate~
+        }
+    }
+
     namespace pmic_svc {
         class IPmic {
             <<interface>>
@@ -175,6 +197,14 @@ classDiagram
         class measurement_state {
             <<zbus>>
             bool measuring
+        }
+        class config_command {
+            <<zbus>>
+            add_calibration_point, reset_calibration, set_sample_rate
+        }
+        class calibration_state {
+            <<zbus>>
+            status, points, factor
         }
     }
 
@@ -363,16 +393,24 @@ classDiagram
     Client ..> progressor_command : publishes
     Client ..> client_connection : publishes
     Client ..> IIdentity : name from id()
+    JkpService ..> jkp_protocol : check writes, encode values
+    JkpService ..> config_command : publishes
+    JkpService ..> IIdentity : id()
+    JkpService ..> ILoadCell : rate only
+    calibration_state ..> JkpService : listener, notify
+    config_command ..> Event : listener, queue
+    config_command ..> Activity : listener, queue
+    Measurement ..> calibration_state : publishes
     battery ..> Client : listener, Battery service level
     Ads1220 ..> ads1220_driver
     ads1220_emul ..> ads1220_driver : answers its SPI
 ```
 
-The measurement manager's thread takes `Event`s off its queue (fed by a zbus listener on both channels) and, while measuring, calls `sample()` between them: each `ForceSample` becomes a `progressor::Sample` with its time since the measurement started, and batches of up to 50 ms (at most what one notification carries) go out through `ble_svc::client()`. It is the only caller of `ILoadCell`'s single-threaded operations; the debug shell only uses the thread-safe sample rate.
+The measurement manager's thread takes `Event`s off its queue (fed by a zbus listener on its three channels) and, while measuring, calls `sample()` between them: each `ForceSample` becomes a `progressor::Sample` with its time since the measurement started, and batches of up to 50 ms (at most what one notification carries) go out through `ble_svc::client()`. It also applies configuration requests from the JustKeepPulling service (`channels::config_command`: a calibration point, a calibration reset, the sample rate) and publishes how calibration went on `channels::calibration_state`, which the service reads and notifies. It is the only caller of `ILoadCell`'s single-threaded operations; the JustKeepPulling service and the debug shell only read the thread-safe sample rate.
 
 The power manager's thread reads the battery every 30 s (its timer posts an `Event`) and publishes it on `channels::battery`, which the measurement manager answers 0x6F from. A reading at or below 3.3 V with no charging or USB power is confirmed 1 s later; then the client gets the 0x04 low-power warning and, 0.5 s later, the PMIC enters ship mode. It is the only caller of `IPmic`.
 
-The same thread tracks inactivity (`Activity`): a 10 s timer checks for motion and counts idle time, and commands (except battery polls), connections and measurements reset it; nothing counts while measuring. After 4 minutes idle (30 with a client connected), the client is disconnected and, 10 s later unless something happened meanwhile, the SoC enters System OFF, woken by the IMU's motion interrupt.
+The same thread tracks inactivity (`Activity`): a 10 s timer checks for motion and counts idle time, and commands (except battery polls), configuration requests, connections and measurements reset it; nothing counts while measuring. After 4 minutes idle (30 with a client connected), the client is disconnected and, 10 s later unless something happened meanwhile, the SoC enters System OFF, woken by the IMU's motion interrupt.
 
 It also drives the status LED (`Indicator`), as Crimpdeq: blue without a client, green with one, red blinking (250 ms on, 750 ms off, on a 250 ms timer) at or below 3.5 V, and off before sleeping, since GPIOs keep their state in System OFF.
 
@@ -389,4 +427,5 @@ Each component's production file binds the concrete types (see `docs/architectur
 | `led_svc::led()` | `Led` on three `hal::zephyr::GpioOutput`s | devicetree aliases `status-led-red`, `-green`, `-blue`: the XIAO's RGB LED (active low; red P1.22, green P1.24, blue P1.23, as Seeed's current board files), or emulated GPIOs on native_sim |
 | `pmic_svc::pmic()` | `Pmic` on `hal::zephyr::Npm13xxCharger` and `RegulatorShipMode` | devicetree aliases `pmic-charger` and `pmic-regulators`: the XIAO's nPM1300 (bit-banged I2C on P1.18/P1.17), or the emulated chip on native_sim |
 | `ble_svc::client()` | `Client` in `ble_svc.cpp` | Bluetooth: the Progressor GATT service, advertising as `Progressor_NNNN` (NNNN from the device ID) |
+| (none: `jkp_svc` has no API) | `BT_GATT_SERVICE_DEFINE` in `jkp_svc.cpp` | Bluetooth: the JustKeepPulling GATT service, beside the Progressor one; reads `identity()` and `load_cell()`'s sample rate |
 | `load_cell_svc::load_cell()` | `LoadCell` on `hal::zephyr::Ads1220` | devicetree alias `load-cell-adc`: the ADS1220 on the XIAO's SPI (`/CS` P1.00, `/DRDY` P1.31), or the emulated chip on native_sim |

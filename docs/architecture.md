@@ -138,10 +138,11 @@ Tests construct a fresh instance per test with mocks: no singleton reset, no lin
 | `load_cell_svc` | `load-cell-adc` (ADS1220), settings (`load_cell/factor`, `load_cell/rate`) |
 | `pmic_svc` | `pmic-charger` and `pmic-regulators` (the nPM1300) |
 | `ble_svc` | `identity_svc::identity()`, channels `progressor_command` and `client_connection` (out), `battery` (in, for the Battery service) |
-| `measurement_manager` | `load_cell_svc::load_cell()`, `ble_svc::client()`, `identity_svc::identity()`, channels `progressor_command` and `client_connection` (in), `measurement_state` (out), `battery` (read) |
+| `jkp_svc` | `identity_svc::identity()`, `load_cell_svc::load_cell()` (the thread-safe sample rate only), channels `config_command` (out) and `calibration_state` (in) |
+| `measurement_manager` | `load_cell_svc::load_cell()`, `ble_svc::client()`, `identity_svc::identity()`, channels `progressor_command`, `config_command` and `client_connection` (in), `measurement_state` and `calibration_state` (out), `battery` (read) |
 | `motion_svc` | `motion-sensor` (the IMU and its interrupt pin) |
 | `led_svc` | `status-led-red`, `status-led-green`, `status-led-blue` (GPIO) |
-| `power_manager` | `pmic_svc::pmic()`, `motion_svc::motion()`, `led_svc::led()`, `ble_svc::client()`, channel `battery` (out, and in for the LED), channels `progressor_command`, `client_connection` and `measurement_state` (in) |
+| `power_manager` | `pmic_svc::pmic()`, `motion_svc::motion()`, `led_svc::led()`, `ble_svc::client()`, channel `battery` (out, and in for the LED), channels `progressor_command`, `config_command`, `client_connection` and `measurement_state` (in) |
 | `debug_shell` | `identity_svc::identity()`, `load_cell_svc::load_cell()` (the thread-safe sample rate only), channel `battery` (read) |
 
 ## Changes to Zephyr and other dependencies

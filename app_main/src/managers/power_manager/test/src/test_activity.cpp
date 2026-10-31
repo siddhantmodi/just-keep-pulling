@@ -92,6 +92,13 @@ TEST_F( ActivityTest, CommandsKeepItAwake )
     EXPECT_EQ( activity_.idle(), 0s );
 }
 
+TEST_F( ActivityTest, ConfigurationKeepsItAwake )
+{
+    idle_for( 200s );
+    activity_.on_configuration();
+    EXPECT_EQ( activity_.idle(), 0s );
+}
+
 TEST_F( ActivityTest, BatteryPollsDoNotKeepItAwake )
 {
     idle_for( 200s );

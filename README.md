@@ -4,7 +4,37 @@ Zephyr RTOS based firmware for a dynamometer for measuring finger strength for r
 
 Built on the nRF Connect SDK (NCS) for the Seeed XIAO nRF54LM20A, in C++23, with GoogleTest unit tests and Bumble BLE integration tests that run on `native_sim`.
 
-The firmware is `app_main`: a finger-strength dynamometer for the Seeed XIAO nRF54LM20A with an ADS1220 load-cell ADC, compatible with the Tindeq Progressor app (Bluetooth protocol as implemented by [Crimpdeq](https://github.com/crimpdeq)). It advertises as `Progressor_NNNN` and answers the Progressor commands: tare, start/stop measurement (streaming timestamped samples), app version, Progressor ID, battery voltage (from the nPM1300 PMIC), shutdown, and Crimpdeq's add-calibration-point. On a low battery it sends the Progressor low-power warning and puts the PMIC in ship mode. After 4 minutes idle (30 with the app connected) it sleeps until it is moved (IMU wake-on-motion). The status LED shows blue while waiting for the app, green when connected and blinking red on a low battery, as Crimpdeq's. OTA updates are still to come; see `docs/architecture.md` for the patterns it follows and `docs/app_main.md` for how its parts connect.
+The firmware is `app_main`: a finger-strength dynamometer for the Seeed XIAO nRF54LM20A with an ADS1220 load-cell ADC, compatible with the Tindeq Progressor app (Bluetooth protocol as implemented by [Crimpdeq](https://github.com/crimpdeq)). It advertises as `Progressor_NNNN` and answers the Progressor commands: tare, start/stop measurement (streaming timestamped samples), app version, Progressor ID, battery voltage (from the nPM1300 PMIC) and shutdown. Calibration, the sample rate and the full device ID are on our own JustKeepPulling service (below), beside the standard Device Information and Battery services. On a low battery it sends the Progressor low-power warning and puts the PMIC in ship mode. After 4 minutes idle (30 with the app connected) it sleeps until it is moved (IMU wake-on-motion). The status LED shows blue while waiting for the app, green when connected and blinking red on a low battery, as Crimpdeq's. OTA updates are still to come; see `docs/architecture.md` for the patterns it follows and `docs/app_main.md` for how its parts connect.
+
+## Bluetooth services
+
+| Service | UUID | For |
+|---|---|---|
+| Tindeq Progressor | `7e4e1701-1ea6-40c9-9dcc-13d34ffead57` | The Tindeq app: tare, measurements, battery voltage, ID, version |
+| JustKeepPulling | `a6bd0001-a614-4d5e-b412-e86a44627954` | Calibration, sample rate, device ID: any GATT client (e.g. nRF Connect) |
+| Device Information, Battery | standard | Firmware version and battery level in generic apps |
+
+JustKeepPulling characteristics (values little-endian; each has a user description, which nRF Connect shows as its name):
+
+| UUID | Name | Access | Value |
+|---|---|---|---|
+| `a6bd0002-…` | Calibration | read, notify | status `u8` (0 ok, 1 measuring, 2 full, 3 fit rejected, 4 failed), points `u8`, factor `f32` (g per ADC code) |
+| `a6bd0003-…` | Add calibration point (kg) | write | the load in kg, `f32` (≥ 0) |
+| `a6bd0004-…` | Reset calibration | write | `01` |
+| `a6bd0005-…` | Sample rate (SPS) | read, write | `u16`: 20, 45, 90, 175, 330, 600 or 1000; used from the next measurement, saved |
+| `a6bd0006-…` | Device ID | read | 6 bytes, as displayed (the Progressor ID sends them reversed) |
+
+A malformed write gets an ATT error: Invalid Attribute Value Length for a wrong size, Value Not Allowed for a bad value.
+
+### Calibrating with nRF Connect
+
+1. Connect to `Progressor_NNNN`, open the JustKeepPulling service and enable notifications on **Calibration**.
+2. Optionally start over: write `01` to **Reset calibration** (back to the default factor; the saved one is erased).
+3. With nothing on the load cell, write `00 00 00 00` (0 kg) to **Add calibration point (kg)**. Calibration notifies `01` (measuring, about 1.25 s, keep it still), then `00` with one point.
+4. Hang a known load and write its weight as a little-endian float: 5 kg `00 00 A0 40`, 10 kg `00 00 20 41`, 20 kg `00 00 A0 41` (any other: `struct.pack("<f", kg).hex()` in Python). From the second point on, the factor is refitted and saved.
+5. Add more loads for a better fit (up to 20 points; status `02` means full, reset to start over). Status `03` means the points gave an implausible factor: they were cleared and the previous factor kept.
+
+Points are kept in RAM until a reboot or reset, as in Crimpdeq; the factor survives reboots.
 
 ## Repository layout
 
@@ -27,7 +57,7 @@ app_main/             The dynamometer firmware (XIAO nRF54LM20A; native_sim for 
   src/main.cpp
   src/channels/       zbus channels: the message contracts shared by every layer
   src/managers/       Own a thread and an event queue (measurement_manager, power_manager)
-  src/services/       One subsystem or peripheral each (identity_svc, load_cell_svc, ble_svc, pmic_svc, motion_svc, led_svc)
+  src/services/       One subsystem or peripheral each (identity_svc, load_cell_svc, ble_svc, jkp_svc, pmic_svc, motion_svc, led_svc)
   src/modules/        Pure logic, no Zephyr (calibration, progressor)
   src/debug_shell/    "jkp" shell commands, debug builds only
     <component>/      Each component:
@@ -35,7 +65,7 @@ app_main/             The dynamometer firmware (XIAO nRF54LM20A; native_sim for 
       src/            Implementation
       mocks/          GoogleMock of its interface, for consumers' tests
       test/           GoogleTest unit test (its own small native_sim app)
-  integration/        pytest + Bumble tests of the whole app over BLE, acting as the Tindeq app (app_main/testcase.yaml)
+  integration/        pytest + Bumble tests of the whole app over BLE, acting as the Tindeq app and as a generic GATT client (app_main/testcase.yaml)
 pylib/zephyr_bumble/  Reusable pytest plugin: Bumble virtual central for native_sim BLE apps
 requirements-test.txt Python dependencies of the integration tests (installed by west_setup.sh)
 scripts/              check_format.sh, check_layering.sh, run_clang_tidy.py

@@ -30,6 +30,11 @@ void Activity::on_command( progressor::Opcode opcode )
     }
 }
 
+void Activity::on_configuration()
+{
+    reset();
+}
+
 void Activity::on_client_connection( bool connected )
 {
     connected_ = connected;

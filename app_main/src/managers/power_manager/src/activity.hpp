@@ -3,8 +3,8 @@
  * @brief power_manager::Activity: the inactivity side of the power manager's logic.
  *
  * Counts idle time in steps of activity_check_interval: each check() without
- * activity adds one. Commands (except battery polls, as Crimpdeq), connections,
- * measurements and motion are activity, and nothing counts while a
+ * activity adds one. Commands (except battery polls, as Crimpdeq), configuration
+ * requests, connections, measurements and motion are activity, and nothing counts while a
  * measurement runs. After the idle timeout (longer while a client is
  * connected, as Crimpdeq), the client is disconnected and, at the next check,
  * the device sleeps until it is moved, with the status LED off.
@@ -45,6 +45,7 @@ public:
     }
 
     void on_command( progressor::Opcode opcode );
+    void on_configuration();
     void on_client_connection( bool connected );
     void on_measurement( bool measuring );
 

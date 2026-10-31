@@ -95,6 +95,8 @@ void on_message( const zbus_channel *chan )
 {
     if( channels::progressor_command.is( chan ) ) {
         post( Event::command_from( channels::progressor_command.const_msg().opcode ) );
+    } else if( channels::config_command.is( chan ) ) {
+        post( Event::of( Event::Type::configuration ) );
     } else if( channels::client_connection.is( chan ) ) {
         post( Event::change( Event::Type::client_connection, channels::client_connection.const_msg().connected ) );
     } else if( channels::measurement_state.is( chan ) ) {
@@ -112,6 +114,7 @@ K_TIMER_DEFINE( power_manager_blink_timer, on_blink_timer, nullptr );
 
 ZBUS_LISTENER_DEFINE( power_manager_listener, on_message );
 ZBUS_CHAN_ADD_OBS( progressor_command_chan, power_manager_listener, 0 );
+ZBUS_CHAN_ADD_OBS( config_command_chan, power_manager_listener, 0 );
 ZBUS_CHAN_ADD_OBS( client_connection_chan, power_manager_listener, 0 );
 ZBUS_CHAN_ADD_OBS( measurement_state_chan, power_manager_listener, 0 );
 ZBUS_CHAN_ADD_OBS( battery_chan, power_manager_listener, 0 );
@@ -152,6 +155,9 @@ fw::Result<> handle( const Event &event )
         return activity().check();
     case Event::Type::command:
         activity().on_command( event.opcode );
+        return {};
+    case Event::Type::configuration:
+        activity().on_configuration();
         return {};
     case Event::Type::client_connection:
         activity().on_client_connection( event.active );

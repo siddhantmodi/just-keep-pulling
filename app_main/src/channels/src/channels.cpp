@@ -11,7 +11,12 @@
 
 // Commands are events, never read back, so the initial value is only a placeholder.
 ZBUS_CHAN_DEFINE( progressor_command_chan, progressor::Command, nullptr, nullptr, ZBUS_OBSERVERS_EMPTY,
-                  ZBUS_MSG_INIT( progressor::Opcode::stop_measurement, 0.0F ) );
+                  ZBUS_MSG_INIT( progressor::Opcode::stop_measurement ) );
 ZBUS_CHAN_DEFINE( client_connection_chan, channels::ClientConnection, nullptr, nullptr, ZBUS_OBSERVERS_EMPTY, ZBUS_MSG_INIT( false ) );
 ZBUS_CHAN_DEFINE( measurement_state_chan, channels::MeasurementState, nullptr, nullptr, ZBUS_OBSERVERS_EMPTY, ZBUS_MSG_INIT( false ) );
 ZBUS_CHAN_DEFINE( battery_chan, hal::BatteryStatus, nullptr, nullptr, ZBUS_OBSERVERS_EMPTY, ZBUS_MSG_INIT( 0, false, false ) );
+// Commands are events, never read back, so the initial value is only a placeholder.
+ZBUS_CHAN_DEFINE( config_command_chan, channels::ConfigCommand, nullptr, nullptr, ZBUS_OBSERVERS_EMPTY,
+                  ZBUS_MSG_INIT( channels::ConfigCommand::Type::reset_calibration, 0.0F, 0 ) );
+ZBUS_CHAN_DEFINE( calibration_state_chan, channels::CalibrationState, nullptr, nullptr, ZBUS_OBSERVERS_EMPTY,
+                  ZBUS_MSG_INIT( channels::CalibrationStatus::ok, 0, 0.0F ) );

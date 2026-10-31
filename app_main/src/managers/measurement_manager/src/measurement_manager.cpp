@@ -58,6 +58,8 @@ void on_message( const zbus_channel *chan )
         event = measurement_manager::Event::from( channels::progressor_command.const_msg() );
     } else if( channels::client_connection.is( chan ) ) {
         event = measurement_manager::Event::from( channels::client_connection.const_msg() );
+    } else if( channels::config_command.is( chan ) ) {
+        event = measurement_manager::Event::from( channels::config_command.const_msg() );
     } else {
         return;
     }
@@ -94,6 +96,7 @@ void run( void * /*p1*/, void * /*p2*/, void * /*p3*/ )
 ZBUS_LISTENER_DEFINE( measurement_manager_listener, on_message );
 ZBUS_CHAN_ADD_OBS( progressor_command_chan, measurement_manager_listener, 0 );
 ZBUS_CHAN_ADD_OBS( client_connection_chan, measurement_manager_listener, 0 );
+ZBUS_CHAN_ADD_OBS( config_command_chan, measurement_manager_listener, 0 );
 
 // Created suspended; start() runs it once main() has initialized the services.
 // NOLINTNEXTLINE(modernize-avoid-c-arrays): the Zephyr macro declares the thread's stack.

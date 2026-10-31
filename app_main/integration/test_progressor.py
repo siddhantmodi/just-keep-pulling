@@ -4,29 +4,21 @@
 The emulated ADS1220 reads a constant 0 codes, which the boot-time tare zeroes,
 so streamed weights are 0 kg; the maths is unit tested. The emulated nPM1300's
 battery reads 3750 mV, so the low-battery power-off is unit tested too.
+Fixtures (device, peer) are in conftest.py.
 """
 
 from __future__ import annotations
 
 import asyncio
-import re
 import struct
-from collections.abc import AsyncIterator
 from dataclasses import dataclass
 
 import pytest
 import pytest_asyncio
 from bumble.core import UUID
 from bumble.device import Connection, Peer
-from bumble.gatt import (
-    GATT_BATTERY_LEVEL_CHARACTERISTIC,
-    GATT_DEVICE_NAME_CHARACTERISTIC,
-    GATT_FIRMWARE_REVISION_STRING_CHARACTERISTIC,
-    GATT_HARDWARE_REVISION_STRING_CHARACTERISTIC,
-    GATT_MANUFACTURER_NAME_STRING_CHARACTERISTIC,
-    GATT_MODEL_NUMBER_STRING_CHARACTERISTIC,
-    Characteristic,
-)
+from bumble.gatt import GATT_DEVICE_NAME_CHARACTERISTIC, Characteristic
+from gatt_helpers import characteristic
 from zephyr_bumble import connect_by_name, wait_for_log
 
 SERVICE_UUID = UUID("7e4e1701-1ea6-40c9-9dcc-13d34ffead57")
@@ -36,7 +28,6 @@ CONTROL_POINT_UUID = UUID("7e4e1703-1ea6-40c9-9dcc-13d34ffead57")
 TARE = b"\x64"
 START_MEASUREMENT = b"\x65"
 STOP_MEASUREMENT = b"\x66"
-ADD_CALIBRATION_POINT = 0x69
 GET_APP_VERSION = b"\x6b"
 SHUTDOWN = b"\x6e"
 SAMPLE_BATTERY = b"\x6f"
@@ -48,22 +39,9 @@ WEIGHT_MEASUREMENT = 0x01
 # The emulated nPM1300's battery (app_main/boards/native_sim.overlay), as the power manager last read it.
 EMULATED_BATTERY_MV = 3750
 
-# The Battery service's estimate for EMULATED_BATTERY_MV (ble_svc's battery_level.hpp).
-EMULATED_BATTERY_PERCENT = 25
-
-# The ATT MTU iOS negotiates, which carries 30 samples per notification.
-CLIENT_MTU = 247
 # 175 SPS, the default rate: 8 samples in 50 ms.
 SAMPLE_PERIOD_US = 1_000_000 // 175
 SAMPLES_PER_BATCH = 8
-
-
-@dataclass
-class Device:
-    """What the app logged at boot: its advertised name and device ID."""
-
-    name: str
-    device_id: bytes
 
 
 @dataclass
@@ -91,30 +69,6 @@ class Client:
 
 
 @pytest_asyncio.fixture
-async def device(ble_dut) -> Device:
-    lines = "\n".join(await wait_for_log(ble_dut, r'advertising as "Progressor_\d{4}"'))
-    name = re.search(r'advertising as "(Progressor_\d{4})"', lines)
-    device_id = re.search(r"device ID ([0-9A-F]{12})", lines)
-    assert name and device_id, "advertised name or device ID not found in the log"
-    return Device(name=name.group(1), device_id=bytes.fromhex(device_id.group(1)))
-
-
-@pytest_asyncio.fixture
-async def peer(device, virtual_link) -> AsyncIterator[Peer]:
-    connection = await connect_by_name(virtual_link.central, device.name)
-    disconnected = asyncio.Event()
-    connection.on("disconnection", lambda reason: disconnected.set())
-    peer = Peer(connection)
-    await peer.request_mtu(CLIENT_MTU)
-    await peer.discover_services()
-    for service in peer.services:
-        await peer.discover_characteristics(service=service)
-    yield peer
-    if not disconnected.is_set():
-        await connection.disconnect()
-
-
-@pytest_asyncio.fixture
 async def client(peer) -> Client:
     notifications: asyncio.Queue[bytes] = asyncio.Queue()
     await characteristic(peer, DATA_POINT_UUID).subscribe(notifications.put_nowait)
@@ -124,12 +78,6 @@ async def client(peer) -> Client:
         control_point=characteristic(peer, CONTROL_POINT_UUID),
         notifications=notifications,
     )
-
-
-def characteristic(peer: Peer, uuid: UUID):
-    found = peer.get_characteristics_by_uuid(uuid)
-    assert len(found) == 1, f"expected one characteristic {uuid}, found {len(found)}"
-    return found[0]
 
 
 def weight_samples(notification: bytes) -> list[tuple[float, int]]:
@@ -253,10 +201,11 @@ async def test_commands_are_answered_while_measuring(client):
 
 
 @pytest.mark.asyncio
-async def test_add_calibration_point(client, ble_dut):
-    await client.write(bytes([ADD_CALIBRATION_POINT]) + struct.pack("<f", 0.0))
-    # Averaged over 1.25 s at 90 SPS; one point does not change the factor.
-    await wait_for_log(ble_dut, r"calibration point 1: ")
+async def test_calibration_is_not_on_the_progressor_service(client, ble_dut):
+    # 0x69 is a Progressor command (Crimpdeq used it for calibration points);
+    # calibration is on the JustKeepPulling service (test_justkeeppulling.py).
+    await client.write(b"\x69" + struct.pack("<f", 20.0))
+    await wait_for_log(ble_dut, r"unsupported opcode 0x69 ignored")
     assert await drain(client) == []
 
 
@@ -304,19 +253,3 @@ async def test_a_link_dropped_at_once_leaves_the_device_usable(device, ble_dut, 
     async with asyncio.timeout(5):
         assert (await notifications.get())[2:] == b"2.0.4"
     await connection.disconnect()
-
-
-@pytest.mark.asyncio
-async def test_device_information_names_the_firmware(peer):
-    async def read(uuid):
-        return (await characteristic(peer, uuid).read_value()).decode()
-
-    assert await read(GATT_MANUFACTURER_NAME_STRING_CHARACTERISTIC) == "JustKeepPulling"
-    assert await read(GATT_MODEL_NUMBER_STRING_CHARACTERISTIC) == "JustKeepPulling"
-    assert await read(GATT_HARDWARE_REVISION_STRING_CHARACTERISTIC) == "native_sim"
-    assert re.fullmatch(r"\d+\.\d+\.\d+\+\d+", await read(GATT_FIRMWARE_REVISION_STRING_CHARACTERISTIC))
-
-
-@pytest.mark.asyncio
-async def test_battery_service_reports_the_level(peer):
-    assert await characteristic(peer, GATT_BATTERY_LEVEL_CHARACTERISTIC).read_value() == bytes([EMULATED_BATTERY_PERCENT])

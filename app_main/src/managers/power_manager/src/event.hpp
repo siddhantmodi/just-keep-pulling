@@ -24,6 +24,7 @@ struct Event {
         battery_check,     // battery timer
         activity_check,    // activity timer
         command,           // the client wrote a command (opcode)
+        configuration,     // the client wrote a configuration request (calibration, sample rate)
         client_connection, // a client connected or disconnected (active)
         measurement_state, // a measurement started or stopped (active)
         battery,           // a battery reading was published (millivolts)

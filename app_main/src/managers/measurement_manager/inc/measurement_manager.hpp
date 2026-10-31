@@ -4,8 +4,9 @@
  *
  * The measurement manager thread answers the client's Progressor commands
  * (channels::progressor_command) and, while measuring, streams load-cell
- * samples to it. It is the only caller of load_cell_svc's single-threaded
- * operations.
+ * samples to it. It also handles configuration requests (channels::config_command:
+ * calibration, sample rate) and publishes channels::calibration_state. It is the
+ * only caller of load_cell_svc's single-threaded operations.
  *
  * SPDX-License-Identifier: Apache-2.0
  */

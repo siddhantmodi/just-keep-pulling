@@ -31,9 +31,34 @@ using testing::Return;
 constexpr progressor::ProgressorId id{ 0x7E, 0x4E, 0x17, 0x01, 0x1B, 0xD5 };
 constexpr std::uint16_t large_mtu = 247;
 
-Event command( Opcode opcode, float calibration_kg = 0.0F )
+Event command( Opcode opcode )
 {
-    return Event::from( progressor::Command{ .opcode = opcode, .calibration_kg = calibration_kg } );
+    return Event::from( progressor::Command{ .opcode = opcode } );
+}
+
+Event add_point( float kg )
+{
+    return Event::from(
+        channels::ConfigCommand{ .type = channels::ConfigCommand::Type::add_calibration_point, .calibration_kg = kg, .samples_per_second = 0 } );
+}
+
+Event reset_calibration()
+{
+    return Event::from(
+        channels::ConfigCommand{ .type = channels::ConfigCommand::Type::reset_calibration, .calibration_kg = 0.0F, .samples_per_second = 0 } );
+}
+
+Event set_rate( std::uint16_t samples_per_second )
+{
+    return Event::from( channels::ConfigCommand{
+        .type = channels::ConfigCommand::Type::set_sample_rate, .calibration_kg = 0.0F, .samples_per_second = samples_per_second } );
+}
+
+channels::CalibrationState calibration_state()
+{
+    auto state = channels::calibration_state.read();
+    EXPECT_TRUE( state );
+    return state.value_or( channels::CalibrationState{} );
 }
 
 Event connection( bool connected )
@@ -288,17 +313,96 @@ TEST_F( MeasurementTest, TareReportsAFailure )
     EXPECT_EQ( measurement_.handle( command( Opcode::tare ) ), std::unexpected( std::errc::timed_out ) );
 }
 
-TEST_F( MeasurementTest, AddCalibrationPointPassesTheWeight )
+TEST_F( MeasurementTest, StartPublishesTheCalibration )
 {
-    EXPECT_CALL( load_cell_, add_calibration_point( 20.5F ) ).WillOnce( Return( fw::Result<std::size_t>{ 1 } ) );
-    EXPECT_TRUE( measurement_.handle( command( Opcode::add_calibration_point, 20.5F ) ) );
-    EXPECT_TRUE( sent_.empty() ); // no response, as Crimpdeq
+    ON_CALL( load_cell_, calibration_factor() ).WillByDefault( Return( 0.109F ) );
+    ASSERT_TRUE( measurement_.start() );
+
+    auto const state = calibration_state();
+    EXPECT_EQ( state.status, channels::CalibrationStatus::ok );
+    EXPECT_EQ( state.points, 0 );
+    EXPECT_FLOAT_EQ( state.factor_g_per_code, 0.109F );
 }
 
-TEST_F( MeasurementTest, AddCalibrationPointReportsAFailure )
+TEST_F( MeasurementTest, AddsACalibrationPointAndPublishesTheResult )
+{
+    ON_CALL( load_cell_, calibration_factor() ).WillByDefault( Return( 0.12F ) );
+    EXPECT_CALL( load_cell_, add_calibration_point( 20.5F ) ).WillOnce( Return( fw::Result<std::size_t>{ 2 } ) );
+
+    EXPECT_TRUE( measurement_.handle( add_point( 20.5F ) ) );
+
+    auto const state = calibration_state();
+    EXPECT_EQ( state.status, channels::CalibrationStatus::ok );
+    EXPECT_EQ( state.points, 2 );
+    EXPECT_FLOAT_EQ( state.factor_g_per_code, 0.12F );
+    EXPECT_TRUE( sent_.empty() ); // nothing on the Progressor service
+}
+
+TEST_F( MeasurementTest, PublishesMeasuringWhileAveragingAPoint )
+{
+    EXPECT_CALL( load_cell_, add_calibration_point( _ ) )
+        .WillOnce(
+            []
+            {
+                EXPECT_EQ( calibration_state().status, channels::CalibrationStatus::measuring );
+                return fw::Result<std::size_t>{ 1 };
+            } );
+    EXPECT_TRUE( measurement_.handle( add_point( 5.0F ) ) );
+}
+
+TEST_F( MeasurementTest, ReportsAFullCalibration )
 {
     EXPECT_CALL( load_cell_, add_calibration_point( _ ) ).WillOnce( Return( std::unexpected( std::errc::no_buffer_space ) ) );
-    EXPECT_EQ( measurement_.handle( command( Opcode::add_calibration_point, 1.0F ) ), std::unexpected( std::errc::no_buffer_space ) );
+    EXPECT_EQ( measurement_.handle( add_point( 1.0F ) ), std::unexpected( std::errc::no_buffer_space ) );
+    EXPECT_EQ( calibration_state().status, channels::CalibrationStatus::full );
+}
+
+TEST_F( MeasurementTest, ARejectedFitClearsThePoints )
+{
+    EXPECT_CALL( load_cell_, add_calibration_point( _ ) )
+        .WillOnce( Return( fw::Result<std::size_t>{ 1 } ) )
+        .WillOnce( Return( std::unexpected( std::errc::result_out_of_range ) ) );
+    ASSERT_TRUE( measurement_.handle( add_point( 0.0F ) ) );
+
+    EXPECT_FALSE( measurement_.handle( add_point( 1.0F ) ) );
+
+    auto const state = calibration_state();
+    EXPECT_EQ( state.status, channels::CalibrationStatus::fit_rejected );
+    EXPECT_EQ( state.points, 0 );
+}
+
+TEST_F( MeasurementTest, ReportsAFailedPoint )
+{
+    EXPECT_CALL( load_cell_, add_calibration_point( _ ) ).WillOnce( Return( std::unexpected( std::errc::timed_out ) ) );
+    EXPECT_FALSE( measurement_.handle( add_point( 1.0F ) ) );
+    EXPECT_EQ( calibration_state().status, channels::CalibrationStatus::failed );
+}
+
+TEST_F( MeasurementTest, ResetsTheCalibration )
+{
+    EXPECT_CALL( load_cell_, add_calibration_point( _ ) ).WillOnce( Return( fw::Result<std::size_t>{ 3 } ) );
+    ASSERT_TRUE( measurement_.handle( add_point( 1.0F ) ) );
+    EXPECT_CALL( load_cell_, reset_calibration() ).WillOnce( Return( fw::Result<>{} ) );
+    ON_CALL( load_cell_, calibration_factor() ).WillByDefault( Return( 0.109F ) );
+
+    EXPECT_TRUE( measurement_.handle( reset_calibration() ) );
+
+    auto const state = calibration_state();
+    EXPECT_EQ( state.status, channels::CalibrationStatus::ok );
+    EXPECT_EQ( state.points, 0 );
+    EXPECT_FLOAT_EQ( state.factor_g_per_code, 0.109F );
+}
+
+TEST_F( MeasurementTest, SetsTheSampleRate )
+{
+    EXPECT_CALL( load_cell_, set_sample_rate( hal::SampleRate::sps600 ) ).WillOnce( Return( fw::Result<>{} ) );
+    EXPECT_TRUE( measurement_.handle( set_rate( 600 ) ) );
+}
+
+TEST_F( MeasurementTest, RejectsAnUnsupportedSampleRate )
+{
+    EXPECT_CALL( load_cell_, set_sample_rate( _ ) ).Times( 0 );
+    EXPECT_EQ( measurement_.handle( set_rate( 100 ) ), std::unexpected( std::errc::not_supported ) );
 }
 
 TEST_F( MeasurementTest, AnswersTheAppVersion )

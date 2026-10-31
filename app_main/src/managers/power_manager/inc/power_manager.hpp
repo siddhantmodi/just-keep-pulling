@@ -8,9 +8,10 @@
  * Progressor low-power warning, then the PMIC enters ship mode, as Crimpdeq
  * sleeps. It is the only caller of pmic_svc.
  *
- * It also tracks inactivity (commands, connections, measurements and motion
- * are activity): after 4 minutes idle, or 30 with a client connected, it
- * disconnects the client and sleeps (System OFF) until the device is moved.
+ * It also tracks inactivity (commands, configuration requests, connections,
+ * measurements and motion are activity): after 4 minutes idle, or 30 with a
+ * client connected, it disconnects the client and sleeps (System OFF) until
+ * the device is moved.
  *
  * And it drives the status LED, as Crimpdeq: blue without a client, green
  * with one, red blinking on a low battery, off while asleep.

@@ -8,7 +8,6 @@
 #include "progressor.hpp"
 
 #include <bit>
-#include <cmath>
 #include <expected>
 #include <limits>
 #include <ranges>
@@ -23,7 +22,6 @@ namespace
 {
 
 constexpr std::size_t max_payload_size = max_packet_size - header_size;
-constexpr std::size_t float_size = 4;
 
 /** @brief Builds a packet: code, length, then payload appended little-endian. */
 class PacketWriter
@@ -62,18 +60,12 @@ private:
     Packet packet_{};
 };
 
-[[nodiscard]] bool takes_no_payload( Opcode opcode ) noexcept
-{
-    return opcode != Opcode::add_calibration_point;
-}
-
 [[nodiscard]] fw::Result<Opcode> to_opcode( std::uint8_t value ) noexcept
 {
     switch( static_cast<Opcode>( value ) ) {
     case Opcode::tare:
     case Opcode::start_measurement:
     case Opcode::stop_measurement:
-    case Opcode::add_calibration_point:
     case Opcode::get_app_version:
     case Opcode::shutdown:
     case Opcode::sample_battery:
@@ -81,31 +73,6 @@ private:
         return static_cast<Opcode>( value );
     }
     return std::unexpected( std::errc::not_supported );
-}
-
-[[nodiscard]] float read_f32( std::span<const std::uint8_t, float_size> bytes ) noexcept
-{
-    std::uint32_t bits = 0;
-    for( std::size_t i = 0; i < float_size; ++i ) {
-        bits |= static_cast<std::uint32_t>( bytes[i] ) << ( 8 * i );
-    }
-    return std::bit_cast<float>( bits );
-}
-
-[[nodiscard]] fw::Result<float> decode_calibration_kg( std::span<const std::uint8_t> payload ) noexcept
-{
-    // Either the f32 straight after the opcode, or a length byte of 4 and then the f32.
-    if( payload.size() == float_size + 1 && payload[0] == float_size ) {
-        payload = payload.subspan( 1 );
-    }
-    if( payload.size() != float_size ) {
-        return std::unexpected( std::errc::invalid_argument );
-    }
-    float const kg = read_f32( payload.first<float_size>() );
-    if( !std::isfinite( kg ) || kg < 0.0F ) {
-        return std::unexpected( std::errc::invalid_argument );
-    }
-    return kg;
 }
 
 } // namespace
@@ -119,14 +86,7 @@ fw::Result<Command> decode_command( std::span<const std::uint8_t> bytes ) noexce
     if( !opcode ) {
         return std::unexpected( opcode.error() );
     }
-    if( takes_no_payload( *opcode ) ) {
-        return Command{ .opcode = *opcode, .calibration_kg = 0.0F };
-    }
-    auto kg = decode_calibration_kg( bytes.subspan( 1 ) );
-    if( !kg ) {
-        return std::unexpected( kg.error() );
-    }
-    return Command{ .opcode = *opcode, .calibration_kg = *kg };
+    return Command{ .opcode = *opcode };
 }
 
 Packet encode_battery_voltage( std::uint32_t millivolts ) noexcept
