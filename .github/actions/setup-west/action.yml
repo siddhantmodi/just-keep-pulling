@@ -3,7 +3,16 @@ name: Set up west workspace
 description: >
   Restore cached west dependencies and run west_setup.sh. The repo is checked
   out at the job workspace, so its parent directory is the west topdir and
-  dependencies land in ../deps (same layout as the devcontainer).
+  dependencies land in ../deps (same layout as the devcontainer). Also restores
+  this job's ccache, which Zephyr builds use automatically.
+
+inputs:
+  ccache-key:
+    description: >
+      Name for this job's compiler cache, unique per job and matrix entry
+      (e.g. "unit", "build-app_main-nrf54l15dk"). Jobs compile different
+      things, so each keeps its own cache.
+    required: true
 
 runs:
   using: composite
@@ -24,3 +33,26 @@ runs:
     - name: Initialize and update west workspace
       shell: bash
       run: ./west_setup.sh
+
+    # In container jobs ${{ github.workspace }} is the host path, so derive the
+    # directory from $GITHUB_WORKSPACE inside the container instead.
+    - name: Configure ccache
+      shell: bash
+      run: |
+        {
+          echo "CCACHE_DIR=$(realpath "$GITHUB_WORKSPACE/..")/.ccache"
+          echo "CCACHE_MAXSIZE=500M"
+        } >> "$GITHUB_ENV"
+
+    # A new cache is saved every run (caches are immutable); restore-keys picks
+    # up the most recent one for this job.
+    - name: Cache ccache
+      uses: actions/cache@v5
+      with:
+        path: ../.ccache
+        key: ccache-${{ inputs.ccache-key }}-${{ github.sha }}
+        restore-keys: ccache-${{ inputs.ccache-key }}-
+
+    - name: Reset ccache statistics
+      shell: bash
+      run: ccache --zero-stats

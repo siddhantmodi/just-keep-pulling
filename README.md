@@ -86,7 +86,7 @@ scripts/run_clang_tidy.py
 
 ## CI
 
-`.github/workflows/ci.yml` runs in the devcontainer image (`ghcr.io/siddhantmodi/zephyr-dev-nordic`):
+`.github/workflows/ci.yml` runs in the devcontainer image (`ghcr.io/siddhantmodi/zephyr-dev-nordic`). Two caches speed it up: the west dependencies (`../deps`, keyed on `west.yml`, which pins `sdk-nrf` to a tag) and a ccache per job (Zephyr builds use it automatically; each job prints its hit rate at the end).
 
 | Job | What it does |
 |---|---|

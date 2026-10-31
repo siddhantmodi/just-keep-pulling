@@ -46,6 +46,8 @@ jobs:
       - uses: actions/checkout@v6
 
       - uses: ./.github/actions/setup-west
+        with:
+          ccache-key: unit
 
       - name: Run unit tests with coverage and sanitizers
         run: |
@@ -79,6 +81,10 @@ jobs:
           name: unit-test-coverage
           path: twister-unit/coverage/
 
+      - name: ccache statistics
+        if: always()
+        run: ccache --show-stats
+
   integration:
     name: Integration tests (Bumble / native_sim)
     needs: [unit]
@@ -90,6 +96,8 @@ jobs:
       - uses: actions/checkout@v6
 
       - uses: ./.github/actions/setup-west
+        with:
+          ccache-key: integration
 
       - name: Run integration tests
         run: |
@@ -113,6 +121,10 @@ jobs:
             twister-integration/**/handler.log
             twister-integration/**/report.xml
 
+      - name: ccache statistics
+        if: always()
+        run: ccache --show-stats
+
   tidy:
     name: clang-tidy (${{ matrix.app }})
     runs-on: ubuntu-latest
@@ -127,9 +139,15 @@ jobs:
       - uses: actions/checkout@v6
 
       - uses: ./.github/actions/setup-west
+        with:
+          ccache-key: tidy-${{ matrix.app }}
 
       - name: Build with clang and run clang-tidy
         run: scripts/run_clang_tidy.py --app ${{ matrix.app }} --board "$NATIVE_BOARD"
+
+      - name: ccache statistics
+        if: always()
+        run: ccache --show-stats
 
   build:
     name: Build ${{ matrix.app }} (${{ matrix.board }})
@@ -152,6 +170,8 @@ jobs:
       - uses: actions/checkout@v6
 
       - uses: ./.github/actions/setup-west
+        with:
+          ccache-key: build-${{ matrix.app }}-${{ matrix.board_name }}
 
       - name: Build firmware
         run: west build -p always -b ${{ matrix.board }} -d "$BUILD_DIR" ${{ matrix.app }}
@@ -178,3 +198,7 @@ jobs:
           name: firmware-${{ matrix.app }}-${{ matrix.board_name }}
           path: artifacts/*
           if-no-files-found: error
+
+      - name: ccache statistics
+        if: always()
+        run: ccache --show-stats
