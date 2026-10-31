@@ -4,7 +4,7 @@ Zephyr RTOS based firmware for a dynamometer for measuring finger strength for r
 
 Built on the nRF Connect SDK (NCS) for the nRF54L15 DK, in C++23, with GoogleTest unit tests and Bumble BLE integration tests that run on `native_sim`.
 
-The firmware is `app_main`: a finger-strength dynamometer for the Seeed XIAO nRF54LM20A with an ADS1220 load-cell ADC, compatible with the Tindeq Progressor app (Bluetooth protocol as implemented by [Crimpdeq](https://github.com/crimpdeq)). It is being built up; see `docs/architecture.md` for the patterns it follows.
+The firmware is `app_main`: a finger-strength dynamometer for the Seeed XIAO nRF54LM20A with an ADS1220 load-cell ADC, compatible with the Tindeq Progressor app (Bluetooth protocol as implemented by [Crimpdeq](https://github.com/crimpdeq)). It advertises as `Progressor_NNNN` and answers the Progressor commands: tare, start/stop measurement (streaming timestamped samples), app version, Progressor ID, battery voltage (a placeholder until the PMIC is read), shutdown, and Crimpdeq's add-calibration-point. Power management, the LED and OTA updates are still to come; see `docs/architecture.md` for the patterns it follows and `docs/app_main.md` for how its parts connect.
 
 `app_template` is the reference app the patterns were developed on. It exposes a custom BLE GATT service (advertised as "Just Keep Pulling"): an LED characteristic (read/write, `uint8` 0/1) and the die temperature (read, `int16` little-endian, hundredths of a degree Celsius). The service is open: no pairing is required. See `app_template/src/services/ble_svc/inc/ble_svc.hpp` for the UUIDs.
 
@@ -35,7 +35,7 @@ app_template/         Reference app (LED + die temperature over BLE), same layou
       src/            Implementation
       mocks/          GoogleMock of its interface, for consumers' tests
       test/           GoogleTest unit test (its own small native_sim app)
-  integration/        pytest + Bumble tests of the whole app over BLE (app_template/testcase.yaml)
+  integration/        pytest + Bumble tests of the whole app over BLE (<app>/testcase.yaml)
 pylib/zephyr_bumble/  Reusable pytest plugin: Bumble virtual central for native_sim BLE apps
 requirements-test.txt Python dependencies of the integration tests (installed by west_setup.sh)
 scripts/              check_format.sh, check_layering.sh, run_clang_tidy.py

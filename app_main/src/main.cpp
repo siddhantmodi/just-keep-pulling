@@ -8,6 +8,7 @@
 #include "ble_svc.hpp"
 #include "identity_svc.hpp"
 #include "load_cell_svc.hpp"
+#include "measurement_manager.hpp"
 
 #include <zephyr/app_version.h>
 #include <zephyr/logging/log.h>
@@ -34,6 +35,12 @@ int main()
         return 0;
     }
     LOG_INF( "calibration: %ld ug per code", std::lround( load_cell_svc::load_cell().calibration_factor() * 1e6F ) );
+
+    // Before Bluetooth, so the manager observes the first command.
+    if( auto ret = measurement_manager::start(); !ret ) {
+        LOG_ERR( "measurement manager start failed: %d", fw::err::to_zephyr( ret.error() ) );
+        return 0;
+    }
 
     if( auto ret = ble_svc::init(); !ret ) {
         LOG_ERR( "BLE service init failed: %d", fw::err::to_zephyr( ret.error() ) );

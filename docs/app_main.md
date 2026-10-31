@@ -13,6 +13,22 @@ classDiagram
         main()
     }
 
+    namespace measurement_manager {
+        class Manager {
+            <<manager thread>>
+            +start() Result
+            +handle(Event) Result
+            +measuring() bool
+            +sample() Result
+            +dropped_batches() uint32
+        }
+        class Event {
+            <<tagged union>>
+            command: progressor::Command
+            client_connection: ClientConnection
+        }
+    }
+
     class debug_shell {
         <<debug builds only>>
         jkp id [set hex]
@@ -175,6 +191,7 @@ classDiagram
     main ..> ILoadCell : load_cell()
     main ..> fw_settings : init
     main ..> Client : ble_svc init()
+    main ..> Manager : measurement_manager start()
     debug_shell ..> IIdentity
     debug_shell ..> ILoadCell : rate only
 
@@ -186,6 +203,12 @@ classDiagram
     LoadCell ..> ForceSample
     ILoadCellAdc ..> SampleRate
     ILoadCellAdc ..> LoadCellSample
+    Manager --> ILoadCell : load_cell_
+    Manager --> IClient : client_
+    Manager ..> progressor : encode responses and samples
+    Manager ..> Event
+    progressor_command ..> Event : listener, queue
+    client_connection ..> Event : listener, queue
     Client ..> progressor : decode_command
     Client ..> progressor_command : publishes
     Client ..> client_connection : publishes
@@ -194,7 +217,7 @@ classDiagram
     ads1220_emul ..> ads1220_driver : answers its SPI
 ```
 
-Nothing observes the channels yet: the measurement manager (next) handles the commands, turns `ForceSample`s into `progressor` packets, and answers through `ble_svc::client()`.
+The measurement manager's thread takes `Event`s off its queue (fed by a zbus listener on both channels) and, while measuring, calls `sample()` between them: each `ForceSample` becomes a `progressor::Sample` with its time since the measurement started, and batches of up to 50 ms (at most what one notification carries) go out through `ble_svc::client()`. It is the only caller of `ILoadCell`'s single-threaded operations; the debug shell only uses the thread-safe sample rate.
 
 ## Production wiring
 
@@ -203,5 +226,6 @@ Each component's production file binds the concrete types (see `docs/architectur
 | Accessor | Instance | Bound to |
 |---|---|---|
 | `identity_svc::identity()` | `Identity` | settings key `identity/id` |
+| `measurement_manager::start()` | `Manager` in `measurement_manager.cpp`, built on first use | `load_cell()`, `client()`, and the device ID as at boot; thread priority 2 |
 | `ble_svc::client()` | `Client` in `ble_svc.cpp` | Bluetooth: the Progressor GATT service, advertising as `Progressor_NNNN` (NNNN from the device ID) |
 | `load_cell_svc::load_cell()` | `LoadCell` on `hal::zephyr::Ads1220` | devicetree alias `load-cell-adc`: the ADS1220 on the XIAO's SPI (`/CS` P1.00, `/DRDY` P1.31), or the emulated chip on native_sim |

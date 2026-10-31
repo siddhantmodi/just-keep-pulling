@@ -1,0 +1,39 @@
+# SPDX-License-Identifier: Apache-2.0
+
+config APP_MEASUREMENT_MANAGER
+	bool "Measurement manager"
+	depends on ZBUS && APP_LOAD_CELL_SVC && APP_BLE_SVC && APP_IDENTITY_SVC
+	help
+	  Thread that answers the Progressor commands from the client (zbus) and,
+	  while measuring, samples the load cell and streams the samples to the
+	  client in batches.
+
+if APP_MEASUREMENT_MANAGER
+
+config APP_MEASUREMENT_MANAGER_STACK_SIZE
+	int "Measurement manager thread stack size"
+	default 3072
+	help
+	  Also saves the calibration factor to settings.
+
+config APP_MEASUREMENT_MANAGER_PRIORITY
+	int "Measurement manager thread priority"
+	default 2
+	help
+	  Above the other application threads, so sampling keeps up at high
+	  rates. The ADC driver buffers samples meanwhile, and counts the ones
+	  it has to overwrite.
+
+config APP_MEASUREMENT_MANAGER_QUEUE_DEPTH
+	int "Measurement manager event queue depth"
+	default 8
+	help
+	  Events waiting for the manager thread. When full, new events are
+	  dropped (and counted) rather than blocking the publisher.
+
+endif # APP_MEASUREMENT_MANAGER
+
+# Outside "if APP_MEASUREMENT_MANAGER" so the unit test gets the log level too.
+module = APP_MEASUREMENT_MANAGER
+module-str = measurement_manager
+source "subsys/logging/Kconfig.template.log_config"

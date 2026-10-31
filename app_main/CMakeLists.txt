@@ -22,5 +22,8 @@ add_subdirectory_ifdef(CONFIG_APP_IDENTITY_SVC src/services/identity_svc)
 add_subdirectory_ifdef(CONFIG_APP_LOAD_CELL_SVC src/services/load_cell_svc)
 add_subdirectory_ifdef(CONFIG_APP_BLE_SVC src/services/ble_svc)
 
+# Managers: own a thread and an event queue; the only callers of single-threaded services
+add_subdirectory_ifdef(CONFIG_APP_MEASUREMENT_MANAGER src/managers/measurement_manager)
+
 # Debug builds only (debug.conf)
 add_subdirectory_ifdef(CONFIG_APP_DEBUG_SHELL src/debug_shell)
