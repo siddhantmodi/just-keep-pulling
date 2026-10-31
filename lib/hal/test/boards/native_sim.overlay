@@ -17,3 +17,29 @@
 		low-side-power-switch;
 	};
 };
+
+/*
+ * An emulated nPM1300 on native_sim's I2C emulator bus: Zephyr's own MFD,
+ * charger and regulator drivers run against the repo's register emulator.
+ */
+&i2c0 {
+	pmic: npm1300@6b {
+		compatible = "nordic,npm1300";
+		reg = <0x6b>;
+
+		pmic_charger: charger {
+			compatible = "nordic,npm1300-charger";
+			term-microvolt = <4200000>;
+			current-microamp = <500000>;
+			dischg-limit-microamp = <1000000>;
+			vbus-limit-microamp = <500000>;
+			thermistor-ohms = <10000>;
+			thermistor-beta = <3380>;
+			charging-enable;
+		};
+
+		pmic_regulators: regulators {
+			compatible = "nordic,npm1300-regulator";
+		};
+	};
+};

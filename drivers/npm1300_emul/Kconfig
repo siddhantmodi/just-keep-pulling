@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: Apache-2.0
+
+config JKP_NPM1300_EMUL
+	bool "nPM1300 PMIC emulator"
+	default y
+	depends on DT_HAS_NORDIC_NPM1300_ENABLED && EMUL && I2C_EMUL
+	help
+	  Emulates the nPM1300's registers on an I2C emulator bus (native_sim),
+	  so Zephyr's own MFD, charger and regulator drivers run in tests. The
+	  battery measurement and charger state are set with
+	  <jkp/drivers/npm1300_emul.h>.

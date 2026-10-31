@@ -16,7 +16,7 @@ lib/
   fw/                 Header-only C++ helpers: fw::Result, fw::ChannelRef (zbus), fw::QueueRef (k_msgq), fw::ScopedLock, fw::settings
   hal/                Hardware capability interfaces (<hal/...>), Zephyr implementations (<hal/zephyr/...>), GoogleMocks (<hal/mocks/...>)
   gtest/              GoogleTest/GoogleMock as a Zephyr library (CONFIG_GTEST), test-only
-drivers/              Repo-owned Zephyr drivers: ADS1220 load-cell ADC (+ chip emulator), emulated temperature sensor
+drivers/              Repo-owned Zephyr drivers and emulators: ADS1220 load-cell ADC (+ chip emulator), nPM1300 PMIC emulator, emulated temperature sensor
 include/jkp/          Their headers; dts/bindings/ holds their devicetree bindings
 docs/architecture.md  Design rules, layers, why C++, and when to revisit them
 docs/app_main.md      app_main's class diagram (Mermaid): interfaces, implementations, modules, drivers
