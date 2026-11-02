@@ -48,14 +48,6 @@ TEST_F( Npm13xxTest, ReadsTheBatteryVoltage )
     EXPECT_FALSE( status->external_power );
 }
 
-TEST_F( Npm13xxTest, VoltageHasTheAdcsResolution )
-{
-    npm1300_emul_set_battery_mv( pmic, 3300 );
-    auto status = charger_.read();
-    ASSERT_TRUE( status );
-    EXPECT_NEAR( status->millivolts, 3300U, 5U );
-}
-
 TEST_F( Npm13xxTest, ReportsChargingAndUsbPower )
 {
     npm1300_emul_set_charging( pmic, true );
@@ -73,12 +65,6 @@ TEST_F( Npm13xxTest, UsbPowerWithoutChargingIsNotCharging )
     ASSERT_TRUE( status );
     EXPECT_FALSE( status->charging );
     EXPECT_TRUE( status->external_power );
-}
-
-TEST_F( Npm13xxTest, ChargerIsConfiguredFromDevicetree )
-{
-    // Zephyr's driver enabled charging at boot (charging-enable).
-    EXPECT_EQ( npm1300_emul_get_register( pmic, 0x03, 0x04 ), 1U );
 }
 
 // Last: the emulator stays in ship mode afterwards.

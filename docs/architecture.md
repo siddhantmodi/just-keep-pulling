@@ -28,7 +28,7 @@ If yes, use it directly. A seam (an injected, mockable dependency) is only neede
 1. **Wrap only to remove a recurring C-ism**: `CONTAINER_OF` callback trampolines, manual lock/unlock, `k_timeout_t` instead of `std::chrono`, negative-errno ints instead of `fw::Result`. A wrapper that only renames a Zephyr function is not added; call Zephyr directly.
 2. **Components depend on interfaces, so every layer can be unit tested against mocks of the layer below.** Hardware capabilities are interfaces in `lib/hal`; a service's interface is in its public header. Kernel objects, zbus and settings are not mocked: they run for real in tests (the table above).
 3. **Logic doesn't own threads.** A component's logic is a synchronous object. Inputs arrive as method calls (a zbus message, a "timeout fired" event); outputs are publishes or HAL calls. The thread, work item or callback that drives it is plumbing. Tests call the methods directly: no sleeps, no thread synchronization.
-4. **Seams are lean virtual interfaces.** An interface has pure virtual methods and a protected, non-virtual destructor (nothing is deleted through it); implementations are `final`. Objects are static and passed by reference: no `shared_ptr`, factories, heap or `std::function`. Hardware interfaces describe a capability (`hal::IDigitalOutput`, `hal::ITemperatureSensor`, a temperature in milli-°C), never *which* instance or *what it is for*: one `MockDigitalOutput` serves an LED, a buzzer and an enable line, and Zephyr types such as `sensor_channel` stay in the implementation. Concept-constrained templates are reserved for proven hot paths (e.g. per-sample code at interrupt rate).
+4. **Seams are lean virtual interfaces.** An interface has pure virtual methods and a protected, non-virtual destructor (nothing is deleted through it); implementations are `final`. Objects are static and passed by reference: no `shared_ptr`, factories, heap or `std::function`. Hardware interfaces describe a capability (`hal::IDigitalOutput`, `hal::IBatteryCharger`, a voltage in mV), never *which* instance or *what it is for*: one `MockDigitalOutput` serves an LED, a buzzer and an enable line, and Zephyr types such as `sensor_channel` stay in the implementation. Concept-constrained templates are reserved for proven hot paths (e.g. per-sample code at interrupt rate).
 5. **Large stacks are split, not wrapped.** BLE/networking code is a thin adapter (GATT table, callbacks, advertising) over pure logic (encoding, validation, state machines). The logic is unit tested; the adapter is covered by integration tests (Bumble).
 
 ## Integration tests
@@ -48,7 +48,7 @@ lib/hal/           Hardware capabilities
   include/hal/zephyr/         Thin Zephyr implementations, tested against native_sim emulators
   mocks/include/hal/mocks/    GoogleMocks of the interfaces (on the include path only with CONFIG_GTEST)
 lib/gtest/         GoogleTest/GoogleMock as a Zephyr library
-drivers/           Zephyr drivers owned by this repo: the ADS1220 load-cell ADC and its chip emulator, the emulated temperature sensor
+drivers/           Zephyr drivers owned by this repo: the ADS1220 load-cell ADC and its chip emulator, the nPM1300 PMIC emulator
 include/jkp/       Their public headers (<jkp/drivers/...>)
 dts/bindings/      Their devicetree bindings
 app_<name>/src/    Components of one application
@@ -128,7 +128,7 @@ load_cell_svc/
 
 Tests construct a fresh instance per test with mocks: no singleton reset, no link-time seam. A component test builds only the logic `.cpp` files and sources the component's `Kconfig` (for its log level). A HAL implementation is tested once in `lib/hal/test` against an emulator; components never test it again.
 
-**App code is identical on every board.** Board differences live in devicetree: production files bind an alias (`load-cell-adc`), and each board's overlay points it at real hardware or an emulator. Where Zephyr has no emulator for a peripheral (e.g. the die temperature sensor that `lib/hal`'s tests use), the repo adds a small emulated driver under `drivers/` with a test-control header, instead of `#if` branches in the app. Where the repo has its own driver, the emulator works at the chip's bus level instead (the ADS1220 emulator answers SPI commands on native_sim's SPI emulator bus and pulses an emulated /DRDY pin), so the real driver runs in tests too.
+**App code is identical on every board.** Board differences live in devicetree: production files bind an alias (`load-cell-adc`), and each board's overlay points it at real hardware or an emulator. Where Zephyr has no emulator for a peripheral (e.g. the nPM1300 PMIC), the repo adds one under `drivers/` with a test-control header, instead of `#if` branches in the app. Where the repo has its own driver, the emulator works at the chip's bus level instead (the ADS1220 emulator answers SPI commands on native_sim's SPI emulator bus and pulses an emulated /DRDY pin), so the real driver runs in tests too.
 
 **Who depends on whom** (wired in production files):
 

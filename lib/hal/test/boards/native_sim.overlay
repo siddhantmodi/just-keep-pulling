@@ -1,12 +1,5 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 
-/ {
-	temp_emul: temp-emul {
-		compatible = "jkp,temperature-emul";
-		millicelsius = <21500>;
-	};
-};
-
 /* An emulated ADS1220 on native_sim's SPI emulator bus, /DRDY on an emulated GPIO. */
 &spi0 {
 	load_cell_adc: ads1220@0 {

@@ -6,5 +6,5 @@ config FW_HAL
 	default y
 	help
 	  Header-only interfaces for hardware capabilities (digital output,
-	  temperature sensor, ...) with thin Zephyr implementations. Components
+	  load-cell ADC, battery charger, ...) with thin Zephyr implementations. Components
 	  take these interfaces so unit tests can inject mocks.
