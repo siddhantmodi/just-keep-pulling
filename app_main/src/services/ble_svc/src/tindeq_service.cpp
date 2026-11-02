@@ -60,7 +60,7 @@ ssize_t write_control_point( bt_conn * /*conn*/, const bt_gatt_attr * /*attr*/, 
         return len;
     }
     LOG_DBG( "command 0x%02x", static_cast<unsigned>( command->opcode ) );
-    if( auto ret = channels::progressor_command.publish( *command ); !ret ) {
+    if( auto ret = channels::progressor_command.publish( *command, channels::lock_timeout ); !ret ) {
         LOG_ERR( "command publish failed: %d", fw::err::to_zephyr( ret.error() ) );
         return BT_GATT_ERR( BT_ATT_ERR_UNLIKELY );
     }

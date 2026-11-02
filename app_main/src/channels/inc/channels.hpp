@@ -69,6 +69,13 @@ ZBUS_CHAN_DECLARE( progressor_command_chan, client_connection_chan, measurement_
 namespace channels
 {
 
+/**
+ * @brief How long a thread waits for a channel another thread is publishing on
+ *        or reading: zbus holds it for microseconds, but the holder may be
+ *        preempted. ISRs and listeners use K_NO_WAIT instead.
+ */
+inline constexpr k_timeout_t lock_timeout = K_MSEC( 10 );
+
 /** @brief Commands the client wrote to the Progressor control point, decoded. */
 inline constexpr fw::ChannelRef<progressor::Command> progressor_command{ progressor_command_chan };
 inline constexpr fw::ChannelRef<ClientConnection> client_connection{ client_connection_chan };

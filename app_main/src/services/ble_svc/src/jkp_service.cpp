@@ -46,9 +46,6 @@ const bt_uuid_128 reset_calibration_uuid = BT_UUID_INIT_128( BT_UUID_128_ENCODE(
 const bt_uuid_128 sample_rate_uuid = BT_UUID_INIT_128( BT_UUID_128_ENCODE( 0xa6bd0005, 0xa614, 0x4d5e, 0xb412, 0xe86a44627954 ) );
 const bt_uuid_128 device_id_uuid = BT_UUID_INIT_128( BT_UUID_128_ENCODE( 0xa6bd0006, 0xa614, 0x4d5e, 0xb412, 0xe86a44627954 ) );
 
-/** @brief How long a read waits for a publisher to release the calibration channel. */
-constexpr k_timeout_t channel_timeout = K_MSEC( 10 );
-
 /** @brief The ATT error for a write that jkp_protocol.hpp rejected. */
 ssize_t write_error( std::errc error )
 {
@@ -58,7 +55,7 @@ ssize_t write_error( std::errc error )
 /** @brief Hand a checked request to the measurement manager. */
 ssize_t publish( const channels::ConfigCommand &command, std::uint16_t len )
 {
-    if( auto ret = channels::config_command.publish( command ); !ret ) {
+    if( auto ret = channels::config_command.publish( command, channels::lock_timeout ); !ret ) {
         LOG_ERR( "configuration publish failed: %d", fw::err::to_zephyr( ret.error() ) );
         return BT_GATT_ERR( BT_ATT_ERR_UNLIKELY );
     }
@@ -67,7 +64,7 @@ ssize_t publish( const channels::ConfigCommand &command, std::uint16_t len )
 
 fw::Result<std::array<std::uint8_t, ble_svc::jkp::calibration_size>> encoded_calibration()
 {
-    auto state = channels::calibration_state.read( channel_timeout );
+    auto state = channels::calibration_state.read( channels::lock_timeout );
     if( !state ) {
         return std::unexpected( state.error() );
     }

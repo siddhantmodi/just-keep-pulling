@@ -56,7 +56,7 @@ Event set_rate( std::uint16_t samples_per_second )
 
 channels::CalibrationState calibration_state()
 {
-    auto state = channels::calibration_state.read();
+    auto state = channels::calibration_state.read( K_NO_WAIT );
     EXPECT_TRUE( state );
     return state.value_or( channels::CalibrationState{} );
 }
@@ -264,12 +264,12 @@ TEST_F( MeasurementTest, StopSendsThePendingSamplesAndStopsTheLoadCell )
 TEST_F( MeasurementTest, PublishesWhenAMeasurementStartsAndStops )
 {
     start_measuring();
-    auto state = channels::measurement_state.read();
+    auto state = channels::measurement_state.read( K_NO_WAIT );
     ASSERT_TRUE( state );
     EXPECT_TRUE( state->measuring );
 
     ASSERT_TRUE( measurement_.handle( command( Opcode::stop_measurement ) ) );
-    state = channels::measurement_state.read();
+    state = channels::measurement_state.read( K_NO_WAIT );
     ASSERT_TRUE( state );
     EXPECT_FALSE( state->measuring );
 }
@@ -421,7 +421,7 @@ TEST_F( MeasurementTest, AnswersTheProgressorIdLeastSignificantByteFirst )
 
 TEST_F( MeasurementTest, AnswersTheLatestBatteryReading )
 {
-    ASSERT_TRUE( channels::battery.publish( { .millivolts = 3812, .charging = false, .external_power = false } ) );
+    ASSERT_TRUE( channels::battery.publish( { .millivolts = 3812, .charging = false, .external_power = false }, K_NO_WAIT ) );
 
     ASSERT_TRUE( measurement_.handle( command( Opcode::sample_battery ) ) );
     ASSERT_EQ( sent_.size(), 1U );

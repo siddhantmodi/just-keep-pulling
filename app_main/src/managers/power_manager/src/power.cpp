@@ -38,7 +38,7 @@ fw::Result<> Power::check_battery()
         monitor();
         return std::unexpected( status.error() );
     }
-    if( auto ret = channels::battery.publish( *status ); !ret ) {
+    if( auto ret = channels::battery.publish( *status, channels::lock_timeout ); !ret ) {
         LOG_ERR( "battery publish failed: %d", fw::err::to_zephyr( ret.error() ) );
     }
 

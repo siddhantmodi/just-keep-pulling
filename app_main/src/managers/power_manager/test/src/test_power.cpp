@@ -74,7 +74,7 @@ TEST_F( PowerTest, PublishesEachReading )
 
     ASSERT_TRUE( power_.check() );
 
-    auto published = channels::battery.read();
+    auto published = channels::battery.read( K_NO_WAIT );
     ASSERT_TRUE( published );
     EXPECT_EQ( published->millivolts, 3900U );
     EXPECT_EQ( power_.next_check(), power_manager::check_interval );

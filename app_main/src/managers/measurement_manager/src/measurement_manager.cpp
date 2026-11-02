@@ -64,7 +64,7 @@ void on_message( const zbus_channel *chan )
         return;
     }
 
-    if( !events.put( event ) ) {
+    if( !events.put( event, K_NO_WAIT ) ) {
         std::uint32_t const dropped = dropped_events.fetch_add( 1, std::memory_order_relaxed ) + 1;
         LOG_WRN( "event queue full, dropped event %u (%u dropped so far)", static_cast<unsigned>( event.type ), static_cast<unsigned>( dropped ) );
     }

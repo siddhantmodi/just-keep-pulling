@@ -40,8 +40,8 @@ protected:
 
 TEST_F( QueueRefTest, GetReturnsItemsInOrder )
 {
-    ASSERT_TRUE( queue.put( { .id = 1, .value = -5 } ) );
-    ASSERT_TRUE( queue.put( { .id = 2, .value = 7 } ) );
+    ASSERT_TRUE( queue.put( { .id = 1, .value = -5 }, K_NO_WAIT ) );
+    ASSERT_TRUE( queue.put( { .id = 2, .value = 7 }, K_NO_WAIT ) );
     EXPECT_EQ( queue.size(), 2U );
 
     auto first = queue.get( K_NO_WAIT );
@@ -57,10 +57,10 @@ TEST_F( QueueRefTest, GetReturnsItemsInOrder )
 
 TEST_F( QueueRefTest, PutFailsWithoutBlockingWhenFull )
 {
-    ASSERT_TRUE( queue.put( { .id = 1, .value = 0 } ) );
-    ASSERT_TRUE( queue.put( { .id = 2, .value = 0 } ) );
+    ASSERT_TRUE( queue.put( { .id = 1, .value = 0 }, K_NO_WAIT ) );
+    ASSERT_TRUE( queue.put( { .id = 2, .value = 0 }, K_NO_WAIT ) );
 
-    auto ret = queue.put( { .id = 3, .value = 0 } );
+    auto ret = queue.put( { .id = 3, .value = 0 }, K_NO_WAIT );
 
     ASSERT_FALSE( ret );
     EXPECT_EQ( ret.error(), std::errc::no_message );

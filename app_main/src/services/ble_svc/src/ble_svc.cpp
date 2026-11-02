@@ -301,7 +301,7 @@ void on_connected( bt_conn *conn, std::uint8_t err )
     instance.on_connected( conn );
     k_work_cancel_delayable( &ble_svc_slow_adv_work );
     LOG_INF( "connected" );
-    if( auto ret = channels::client_connection.publish( { .connected = true } ); !ret ) {
+    if( auto ret = channels::client_connection.publish( { .connected = true }, channels::lock_timeout ); !ret ) {
         LOG_ERR( "connection publish failed: %d", fw::err::to_zephyr( ret.error() ) );
     }
 }
@@ -313,7 +313,7 @@ void on_disconnected( bt_conn * /*conn*/, std::uint8_t reason )
         return;
     }
     LOG_INF( "disconnected: 0x%02x", reason );
-    if( auto ret = channels::client_connection.publish( { .connected = false } ); !ret ) {
+    if( auto ret = channels::client_connection.publish( { .connected = false }, channels::lock_timeout ); !ret ) {
         LOG_ERR( "connection publish failed: %d", fw::err::to_zephyr( ret.error() ) );
     }
 }

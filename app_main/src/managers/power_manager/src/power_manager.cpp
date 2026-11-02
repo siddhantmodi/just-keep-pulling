@@ -67,7 +67,7 @@ constinit std::atomic<std::uint32_t> dropped_events{ 0 };
 /** @brief Queue @p event without waiting: from timers (interrupt context) and zbus listeners. */
 void post( const Event &event )
 {
-    if( !events.put( event ) ) {
+    if( !events.put( event, K_NO_WAIT ) ) {
         dropped_events.fetch_add( 1, std::memory_order_relaxed );
     }
 }

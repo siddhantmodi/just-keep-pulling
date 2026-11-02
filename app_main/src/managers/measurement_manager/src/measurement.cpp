@@ -89,7 +89,7 @@ fw::Result<> Measurement::on_command( const progressor::Command &command )
     case Opcode::sample_battery:
     {
         // The power manager's latest reading: measuring here would compete with it for the PMIC.
-        auto battery = channels::battery.read();
+        auto battery = channels::battery.read( channels::lock_timeout );
         if( !battery ) {
             return std::unexpected( battery.error() );
         }
@@ -172,7 +172,7 @@ fw::Result<> Measurement::add_calibration_point( float kg )
 void Measurement::publish_calibration( channels::CalibrationStatus status ) const
 {
     channels::CalibrationState const state{ .status = status, .points = calibration_points_, .factor_g_per_code = load_cell_.calibration_factor() };
-    if( auto ret = channels::calibration_state.publish( state ); !ret ) {
+    if( auto ret = channels::calibration_state.publish( state, channels::lock_timeout ); !ret ) {
         LOG_ERR( "calibration state publish failed: %d", fw::err::to_zephyr( ret.error() ) );
     }
 }
@@ -282,7 +282,7 @@ void Measurement::send_batch()
 
 void Measurement::publish_state() const
 {
-    if( auto ret = channels::measurement_state.publish( { .measuring = measuring() } ); !ret ) {
+    if( auto ret = channels::measurement_state.publish( { .measuring = measuring() }, channels::lock_timeout ); !ret ) {
         LOG_ERR( "measurement state publish failed: %d", fw::err::to_zephyr( ret.error() ) );
     }
 }
