@@ -26,3 +26,15 @@ config JKP_ADS1220_EMUL
 	  Emulates the ADS1220 on an SPI emulator bus (native_sim): conversions at
 	  the configured rate, signalled on an emulated /DRDY pin. Tests set the
 	  samples with <jkp/drivers/ads1220_emul.h>.
+
+if JKP_ADS1220
+module = JKP_ADS1220
+module-str = ads1220
+source "subsys/logging/Kconfig.template.log_config"
+endif
+
+if JKP_ADS1220_EMUL
+module = JKP_ADS1220_EMUL
+module-str = ads1220_emul
+source "subsys/logging/Kconfig.template.log_config"
+endif

@@ -23,7 +23,7 @@
 
 #include <jkp/drivers/npm1300_emul.h>
 
-LOG_MODULE_REGISTER( npm1300_emul, CONFIG_LOG_DEFAULT_LEVEL );
+LOG_MODULE_REGISTER( npm1300_emul, CONFIG_JKP_NPM1300_EMUL_LOG_LEVEL );
 
 #define BASE_COUNT 0x20U
 
@@ -189,18 +189,6 @@ bool npm1300_emul_in_ship_mode( const struct emul *target )
         ship_mode = data->ship_mode;
     }
     return ship_mode;
-}
-
-uint8_t npm1300_emul_get_register( const struct emul *target, uint8_t base, uint8_t offset )
-{
-    struct npm1300_emul_data *data = target->data;
-    uint8_t value = 0;
-
-    K_SPINLOCK( &data->lock )
-    {
-        value = base < BASE_COUNT ? data->registers[base][offset] : 0U;
-    }
-    return value;
 }
 
 static int npm1300_emul_init( const struct emul *target, const struct device *parent )

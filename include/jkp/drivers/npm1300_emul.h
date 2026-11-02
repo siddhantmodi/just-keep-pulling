@@ -34,9 +34,6 @@ void npm1300_emul_set_vbus( const struct emul *target, bool present );
 /** @brief Whether ship mode was requested since the emulator started (the real PMIC would power off). */
 bool npm1300_emul_in_ship_mode( const struct emul *target );
 
-/** @brief A register as last written by the driver, or set by the emulator. */
-uint8_t npm1300_emul_get_register( const struct emul *target, uint8_t base, uint8_t offset );
-
 #ifdef __cplusplus
 }
 #endif

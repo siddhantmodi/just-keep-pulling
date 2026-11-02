@@ -9,3 +9,9 @@ config JKP_NPM1300_EMUL
 	  so Zephyr's own MFD, charger and regulator drivers run in tests. The
 	  battery measurement and charger state are set with
 	  <jkp/drivers/npm1300_emul.h>.
+
+if JKP_NPM1300_EMUL
+module = JKP_NPM1300_EMUL
+module-str = npm1300_emul
+source "subsys/logging/Kconfig.template.log_config"
+endif

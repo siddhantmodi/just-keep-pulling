@@ -17,7 +17,7 @@
 #include <jkp/drivers/ads1220.h>
 #include <string.h>
 
-LOG_MODULE_REGISTER( ads1220, CONFIG_LOG_DEFAULT_LEVEL );
+LOG_MODULE_REGISTER( ads1220, CONFIG_JKP_ADS1220_LOG_LEVEL );
 
 #define CMD_POWERDOWN 0x02U
 #define CMD_RESET     0x06U

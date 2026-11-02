@@ -24,7 +24,7 @@
 #include <jkp/drivers/ads1220_emul.h>
 #include <string.h>
 
-LOG_MODULE_REGISTER( ads1220_emul, CONFIG_LOG_DEFAULT_LEVEL );
+LOG_MODULE_REGISTER( ads1220_emul, CONFIG_JKP_ADS1220_EMUL_LOG_LEVEL );
 
 #define REGISTER_COUNT 4
 #define MAX_TRANSFER   8
@@ -238,7 +238,7 @@ static int ads1220_emul_init( const struct emul *target, const struct device *pa
 
     data->target = target;
     k_timer_init( &data->timer, conversion_done, NULL );
-    // /DRDY is set from the first command: the driver has configured the pin as an input by then.
+    /* /DRDY is set from the first command: the driver has configured the pin as an input by then. */
     return 0;
 }
 
