@@ -98,6 +98,12 @@
 &spi23 {
 	cs-gpios = <&gpio1 0 GPIO_ACTIVE_LOW>;
 
+	/*
+	 * Wire its supply to an always-on rail (BUCK2's 3.3 V, which powers the
+	 * nRF54), not a PMIC-switched one such as LDO1: it initializes (POST_KERNEL
+	 * 80) before the PMIC's regulators (91/92), and powers itself down between
+	 * measurements.
+	 */
 	load_cell_adc: ads1220@0 {
 		compatible = "jkp,ads1220";
 		reg = <0>;
