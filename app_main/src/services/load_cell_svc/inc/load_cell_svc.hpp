@@ -66,7 +66,8 @@ public:
      * @brief Measure a calibration point under @p kg (average over 1.25 s at
      *        90 SPS), then restore the previous sampling. Once the points hold
      *        two different loads, refit the factor and save it. Returns the
-     *        number of points.
+     *        number of points. On any failure the points and factor are as
+     *        before, except after a failed fit, which clears the points.
      *
      * Fails with invalid_argument for a negative or non-finite weight and
      * no_buffer_space after 20 points. A failed fit (see calibration::fit_factor)
@@ -74,8 +75,11 @@ public:
      */
     [[nodiscard]] virtual fw::Result<std::size_t> add_calibration_point( float kg ) = 0;
 
-    /** @brief Clear the points and return to the default factor, erasing the saved one. */
+    /** @brief Erase the saved factor, then clear the points and return to the default factor. */
     [[nodiscard]] virtual fw::Result<> reset_calibration() = 0;
+
+    /** @brief Calibration points held, in RAM only. */
+    [[nodiscard]] virtual std::size_t calibration_points() const = 0;
 
     /** @brief Grams per ADC code. */
     [[nodiscard]] virtual float calibration_factor() const = 0;

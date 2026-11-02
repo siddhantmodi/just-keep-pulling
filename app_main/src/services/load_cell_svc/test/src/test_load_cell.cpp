@@ -194,6 +194,19 @@ TEST_F( LoadCellTest, FailedFitClearsPointsAndKeepsTheFactor )
     EXPECT_EQ( load_cell_.add_calibration_point( 0.0F ), 1U ); // starting over
 }
 
+TEST_F( LoadCellTest, CountsTheCalibrationPoints )
+{
+    ASSERT_TRUE( load_cell_.init() );
+    set_load( 0.0 );
+    ASSERT_TRUE( load_cell_.add_calibration_point( 0.0F ) );
+    set_load( 20.0 );
+    ASSERT_TRUE( load_cell_.add_calibration_point( 20.0F ) );
+    EXPECT_EQ( load_cell_.calibration_points(), 2U );
+
+    ASSERT_TRUE( load_cell_.reset_calibration() );
+    EXPECT_EQ( load_cell_.calibration_points(), 0U );
+}
+
 TEST_F( LoadCellTest, RejectsInvalidCalibrationWeights )
 {
     ASSERT_TRUE( load_cell_.init() );

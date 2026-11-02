@@ -174,13 +174,13 @@ fw::Result<std::size_t> LoadCell::add_calibration_point( float kg )
         LOG_ERR( "calibration point failed: %d", fw::err::to_zephyr( average.error() ) );
         return std::unexpected( average.error() );
     }
-    points_[point_count_++] = calibration::Point{ .raw = *average, .kg = kg };
-    LOG_INF( "calibration point %u: %d codes at %d g", static_cast<unsigned>( point_count_ ), static_cast<int>( *average ),
+    points_[point_count_] = calibration::Point{ .raw = *average, .kg = kg };
+    auto const points = std::span{ points_ }.first( point_count_ + 1 );
+    LOG_INF( "calibration point %u: %d codes at %d g", static_cast<unsigned>( points.size() ), static_cast<int>( *average ),
              static_cast<int>( kg * 1000.0F ) );
-    auto const points = std::span{ points_ }.first( point_count_ );
     // A slope needs two different loads: until then, keep the points (e.g. 0 kg measured twice).
     if( !calibration::has_two_loads( points ) ) {
-        return point_count_;
+        return ++point_count_;
     }
 
     auto factor = calibration::fit_factor( points );
@@ -189,19 +189,27 @@ fw::Result<std::size_t> LoadCell::add_calibration_point( float kg )
         point_count_ = 0;
         return std::unexpected( factor.error() );
     }
-    factor_ = *factor;
-    if( auto ret = fw::settings::save( factor_key, factor_ ); !ret ) {
-        LOG_ERR( "calibration factor not saved: %d", fw::err::to_zephyr( ret.error() ) );
+    if( auto ret = fw::settings::save( factor_key, *factor ); !ret ) {
+        LOG_ERR( "calibration factor not saved, point dropped: %d", fw::err::to_zephyr( ret.error() ) );
         return std::unexpected( ret.error() );
     }
-    return point_count_;
+    factor_ = *factor;
+    return ++point_count_;
 }
 
 fw::Result<> LoadCell::reset_calibration()
 {
+    if( auto ret = fw::settings::erase( factor_key ); !ret ) {
+        return ret;
+    }
     point_count_ = 0;
     factor_ = calibration::default_factor;
-    return fw::settings::erase( factor_key );
+    return {};
+}
+
+std::size_t LoadCell::calibration_points() const
+{
+    return point_count_;
 }
 
 float LoadCell::calibration_factor() const

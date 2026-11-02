@@ -11,8 +11,11 @@
 #include <zephyr/random/random.h>
 
 #include <algorithm>
+#include <charconv>
+#include <cstdint>
 #include <expected>
 #include <fw/settings.hpp>
+#include <ranges>
 #include <system_error>
 
 LOG_MODULE_REGISTER( identity_svc, CONFIG_APP_IDENTITY_SVC_LOG_LEVEL );
@@ -30,20 +33,6 @@ namespace
     return !all( 0x00 ) && !all( 0xFF );
 }
 
-[[nodiscard]] int hex_value( char c ) noexcept
-{
-    if( c >= '0' && c <= '9' ) {
-        return c - '0';
-    }
-    if( c >= 'a' && c <= 'f' ) {
-        return c - 'a' + 10;
-    }
-    if( c >= 'A' && c <= 'F' ) {
-        return c - 'A' + 10;
-    }
-    return -1;
-}
-
 } // namespace
 
 fw::Result<DeviceId> parse_device_id( std::string_view hex ) noexcept
@@ -51,14 +40,15 @@ fw::Result<DeviceId> parse_device_id( std::string_view hex ) noexcept
     if( hex.size() != device_id_hex_length ) {
         return std::unexpected( std::errc::invalid_argument );
     }
+    std::uint64_t value = 0;
+    auto const [end, error] = std::from_chars( hex.begin(), hex.end(), value, 16 );
+    if( error != std::errc{} || end != hex.end() ) {
+        return std::unexpected( std::errc::invalid_argument );
+    }
     DeviceId id{};
-    for( std::size_t i = 0; i < id.size(); ++i ) {
-        int const high = hex_value( hex[2 * i] );
-        int const low = hex_value( hex[( 2 * i ) + 1] );
-        if( high < 0 || low < 0 ) {
-            return std::unexpected( std::errc::invalid_argument );
-        }
-        id[i] = static_cast<std::uint8_t>( ( high << 4 ) | low );
+    for( std::uint8_t &byte : id | std::views::reverse ) {
+        byte = static_cast<std::uint8_t>( value );
+        value >>= 8U;
     }
     return id;
 }
@@ -91,12 +81,12 @@ fw::Result<> Identity::init()
         sys_rand_get( generated.data(), generated.size() );
     } while( !is_usable( generated ) );
 
-    if( auto ret = fw::settings::save( id_key, generated ); !ret ) {
-        LOG_ERR( "device ID not saved: %d", fw::err::to_zephyr( ret.error() ) );
-        return ret;
-    }
     id_ = generated;
     LOG_INF( "generated device ID %s", format_device_id( id_ ).data() );
+    if( auto ret = fw::settings::save( id_key, generated ); !ret ) {
+        LOG_ERR( "device ID not saved, a new one will be generated at the next boot: %d", fw::err::to_zephyr( ret.error() ) );
+        return ret;
+    }
     return {};
 }
 
@@ -113,8 +103,7 @@ fw::Result<> Identity::set_id( const DeviceId &id )
     if( auto ret = fw::settings::save( id_key, id ); !ret ) {
         return ret;
     }
-    id_ = id;
-    LOG_INF( "device ID set to %s", format_device_id( id_ ).data() );
+    LOG_INF( "device ID %s saved for the next boot", format_device_id( id ).data() );
     return {};
 }
 

@@ -46,7 +46,7 @@ int cmd_id_set( const shell *sh, size_t /*argc*/, char **argv )
         shell_error( sh, "not set: %d", fw::err::to_zephyr( ret.error() ) );
         return fw::err::to_zephyr( ret.error() );
     }
-    shell_print( sh, "device ID set; the advertised name changes on the next boot" );
+    shell_print( sh, "device ID saved; used from the next boot" );
     return 0;
 }
 

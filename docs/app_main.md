@@ -94,6 +94,7 @@ classDiagram
             +tare() Result
             +add_calibration_point(kg) Result~size_t~
             +reset_calibration() Result
+            +calibration_points() size_t
             +calibration_factor() float
         }
         class LoadCell {

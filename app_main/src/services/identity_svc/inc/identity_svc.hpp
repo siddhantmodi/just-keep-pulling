@@ -34,14 +34,18 @@ inline constexpr std::size_t device_id_hex_length = 12;
 class IIdentity
 {
 public:
-    /** @brief Load the saved ID, or generate and save one on first boot. */
+    /**
+     * @brief Load the saved ID, or generate and save one on first boot. If saving
+     *        fails, the generated ID is still used until the next boot.
+     */
     [[nodiscard]] virtual fw::Result<> init() = 0;
 
+    /** @brief The ID loaded or generated at boot. */
     [[nodiscard]] virtual const DeviceId &id() const = 0;
 
     /**
-     * @brief Replace and save the ID. Fails with invalid_argument for all-zero
-     *        or all-0xFF IDs. Users of the ID (e.g. advertising) pick it up on the next boot.
+     * @brief Save a new ID, used from the next boot: id() keeps returning the
+     *        boot ID. Fails with invalid_argument for all-zero or all-0xFF IDs.
      */
     [[nodiscard]] virtual fw::Result<> set_id( const DeviceId &id ) = 0;
 

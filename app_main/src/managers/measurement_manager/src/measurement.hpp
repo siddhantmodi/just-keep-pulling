@@ -152,7 +152,6 @@ private:
     std::size_t batch_size_{ 0 };
     std::size_t batch_capacity_{ 1 };
     unsigned read_failures_{ 0 };
-    std::uint8_t calibration_points_{ 0 }; // the load cell's, which are in RAM only
     std::uint32_t dropped_batches_{ 0 };
 };
 

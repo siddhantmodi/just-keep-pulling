@@ -54,6 +54,7 @@ public:
     [[nodiscard]] fw::Result<> tare() override;
     [[nodiscard]] fw::Result<std::size_t> add_calibration_point( float kg ) override;
     [[nodiscard]] fw::Result<> reset_calibration() override;
+    [[nodiscard]] std::size_t calibration_points() const override;
     [[nodiscard]] float calibration_factor() const override;
 
 private:

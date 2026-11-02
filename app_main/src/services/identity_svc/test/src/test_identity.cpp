@@ -85,15 +85,17 @@ TEST_F( IdentityTest, BlankSavedIdIsReplaced )
     EXPECT_NE( identity.id(), DeviceId{} );
 }
 
-TEST_F( IdentityTest, SetIdSavesItForLaterBoots )
+TEST_F( IdentityTest, SetIdSavesItForTheNextBoot )
 {
     identity_svc::Identity identity;
     ASSERT_TRUE( identity.init() );
     DeviceId const chosen{ 0x12, 0x34, 0x56, 0x78, 0x9A, 0xBC };
 
+    DeviceId const booted = identity.id();
+
     ASSERT_TRUE( identity.set_id( chosen ) );
 
-    EXPECT_EQ( identity.id(), chosen );
+    EXPECT_EQ( identity.id(), booted );
     identity_svc::Identity next_boot;
     ASSERT_TRUE( next_boot.init() );
     EXPECT_EQ( next_boot.id(), chosen );

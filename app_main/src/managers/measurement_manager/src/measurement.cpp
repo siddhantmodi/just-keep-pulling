@@ -119,9 +119,10 @@ fw::Result<> Measurement::on_config_command( const channels::ConfigCommand &comm
         return add_calibration_point( command.calibration_kg );
     case Type::reset_calibration:
     {
-        calibration_points_ = 0;
         auto ret = load_cell_.reset_calibration();
-        LOG_INF( "calibration reset to the default factor" );
+        if( ret ) {
+            LOG_INF( "calibration reset to the default factor" );
+        }
         publish_calibration( ret ? channels::CalibrationStatus::ok : channels::CalibrationStatus::failed );
         return ret;
     }
@@ -146,7 +147,6 @@ fw::Result<> Measurement::add_calibration_point( float kg )
 
     auto points = load_cell_.add_calibration_point( kg );
     if( points ) {
-        calibration_points_ = static_cast<std::uint8_t>( *points );
         publish_calibration( channels::CalibrationStatus::ok );
         return {};
     }
@@ -158,8 +158,6 @@ fw::Result<> Measurement::add_calibration_point( float kg )
         break;
     case std::errc::result_out_of_range: // an implausible factor
     case std::errc::invalid_argument:    // no line through the points
-        // The load cell cleared its points and kept the factor.
-        calibration_points_ = 0;
         status = channels::CalibrationStatus::fit_rejected;
         break;
     default:
@@ -171,7 +169,9 @@ fw::Result<> Measurement::add_calibration_point( float kg )
 
 void Measurement::publish_calibration( channels::CalibrationStatus status ) const
 {
-    channels::CalibrationState const state{ .status = status, .points = calibration_points_, .factor_g_per_code = load_cell_.calibration_factor() };
+    channels::CalibrationState const state{ .status = status,
+                                            .points = static_cast<std::uint8_t>( load_cell_.calibration_points() ),
+                                            .factor_g_per_code = load_cell_.calibration_factor() };
     if( auto ret = channels::calibration_state.publish( state, channels::lock_timeout ); !ret ) {
         LOG_ERR( "calibration state publish failed: %d", fw::err::to_zephyr( ret.error() ) );
     }

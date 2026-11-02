@@ -31,6 +31,7 @@ public:
     MOCK_METHOD( fw::Result<>, tare, (), ( override ) );
     MOCK_METHOD( fw::Result<std::size_t>, add_calibration_point, ( float kg ), ( override ) );
     MOCK_METHOD( fw::Result<>, reset_calibration, (), ( override ) );
+    MOCK_METHOD( std::size_t, calibration_points, (), ( const, override ) );
     MOCK_METHOD( float, calibration_factor, (), ( const, override ) );
 };
 

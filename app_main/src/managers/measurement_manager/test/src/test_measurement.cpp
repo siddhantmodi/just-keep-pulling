@@ -327,6 +327,7 @@ TEST_F( MeasurementTest, StartPublishesTheCalibration )
 TEST_F( MeasurementTest, AddsACalibrationPointAndPublishesTheResult )
 {
     ON_CALL( load_cell_, calibration_factor() ).WillByDefault( Return( 0.12F ) );
+    ON_CALL( load_cell_, calibration_points() ).WillByDefault( Return( 2U ) );
     EXPECT_CALL( load_cell_, add_calibration_point( 20.5F ) ).WillOnce( Return( fw::Result<std::size_t>{ 2 } ) );
 
     EXPECT_TRUE( measurement_.handle( add_point( 20.5F ) ) );
