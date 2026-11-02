@@ -99,7 +99,7 @@ protected:
         ON_CALL( client_, att_mtu() ).WillByDefault( Return( large_mtu ) );
         ON_CALL( client_, set_streaming( _ ) ).WillByDefault( Return( fw::Result<>{} ) );
         ON_CALL( client_, disconnect() ).WillByDefault( Return( fw::Result<>{} ) );
-        ON_CALL( client_, send( _ ) )
+        ON_CALL( client_, send_progressor( _ ) )
             .WillByDefault(
                 [this]( std::span<const std::uint8_t> bytes )
                 {
@@ -301,7 +301,7 @@ TEST_F( MeasurementTest, TareSendsThePendingSamplesFirst )
     start_measuring();
     sample( 2 );
     testing::InSequence const in_order;
-    EXPECT_CALL( client_, send( _ ) );
+    EXPECT_CALL( client_, send_progressor( _ ) );
     EXPECT_CALL( load_cell_, tare() ).WillOnce( Return( fw::Result<>{} ) );
 
     EXPECT_TRUE( measurement_.handle( command( Opcode::tare ) ) );
@@ -462,7 +462,9 @@ TEST_F( MeasurementTest, ConnectionChangesNothing )
 TEST_F( MeasurementTest, DropsBatchesTheLinkHasNoRoomForAndKeepsMeasuring )
 {
     start_measuring( hal::SampleRate::sps20 );
-    EXPECT_CALL( client_, send( _ ) ).WillOnce( Return( std::unexpected( std::errc::no_buffer_space ) ) ).WillRepeatedly( Return( fw::Result<>{} ) );
+    EXPECT_CALL( client_, send_progressor( _ ) )
+        .WillOnce( Return( std::unexpected( std::errc::no_buffer_space ) ) )
+        .WillRepeatedly( Return( fw::Result<>{} ) );
 
     sample( 3 );
 
@@ -473,7 +475,7 @@ TEST_F( MeasurementTest, DropsBatchesTheLinkHasNoRoomForAndKeepsMeasuring )
 TEST_F( MeasurementTest, KeepsMeasuringWhenTheClientIsNotSubscribed )
 {
     start_measuring( hal::SampleRate::sps20 );
-    ON_CALL( client_, send( _ ) ).WillByDefault( Return( std::unexpected( std::errc::not_connected ) ) );
+    ON_CALL( client_, send_progressor( _ ) ).WillByDefault( Return( std::unexpected( std::errc::not_connected ) ) );
 
     sample( 3 );
 

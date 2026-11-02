@@ -29,13 +29,14 @@ class IClient
 {
 public:
     /**
-     * @brief Send @p packet as a data point notification, without waiting.
+     * @brief Send a Progressor packet (progressor.hpp) as a notification on the
+     *        Tindeq data point, without waiting.
      *
      * Fails with not_connected when no client is connected and subscribed,
      * and with no_buffer_space when too many notifications are still queued
      * (the link is slower than the data): the packet is dropped.
      */
-    [[nodiscard]] virtual fw::Result<> send( std::span<const std::uint8_t> packet ) = 0;
+    [[nodiscard]] virtual fw::Result<> send_progressor( std::span<const std::uint8_t> packet ) = 0;
 
     /** @brief The connection's ATT MTU (23, the minimum, when not connected). */
     [[nodiscard]] virtual std::uint16_t att_mtu() const = 0;

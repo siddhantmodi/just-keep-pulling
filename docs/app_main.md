@@ -114,7 +114,7 @@ classDiagram
     namespace ble_svc {
         class IClient {
             <<interface>>
-            +send(bytes) Result
+            +send_progressor(bytes) Result
             +att_mtu() uint16
             +set_streaming(bool) Result
             +disconnect() Result

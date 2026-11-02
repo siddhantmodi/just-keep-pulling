@@ -2,7 +2,7 @@
  * @file tindeq_service.hpp
  * @brief What ble_svc's core needs from the Tindeq Progressor GATT service
  *        (tindeq_service.cpp): its UUID, advertised in the scan response, and
- *        the data point that Client::send() notifies.
+ *        the data point that Client::send_progressor() notifies.
  *
  * SPDX-License-Identifier: Apache-2.0
  */

@@ -266,7 +266,7 @@ void Measurement::send_batch()
     // Cannot fail: the batch holds 1 to max_samples_per_packet samples.
     auto packet = progressor::encode_weight_measurements( std::span{ batch_ }.first( batch_size_ ) );
     batch_size_ = 0;
-    auto sent = packet ? client_.send( packet->bytes() ) : std::unexpected( packet.error() );
+    auto sent = packet ? client_.send_progressor( packet->bytes() ) : std::unexpected( packet.error() );
     if( sent || no_listener( sent.error() ) ) {
         return;
     }
@@ -289,7 +289,7 @@ void Measurement::publish_state() const
 
 fw::Result<> Measurement::reply( const progressor::Packet &packet )
 {
-    return client_.send( packet.bytes() );
+    return client_.send_progressor( packet.bytes() );
 }
 
 std::size_t Measurement::batch_capacity() const

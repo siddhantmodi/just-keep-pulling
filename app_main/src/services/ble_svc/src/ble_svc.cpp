@@ -43,8 +43,15 @@
 
 LOG_MODULE_REGISTER( ble_svc, CONFIG_APP_BLE_SVC_LOG_LEVEL );
 
-static_assert( CONFIG_APP_BLE_SVC_MAX_QUEUED_NOTIFICATIONS < CONFIG_BT_ATT_TX_COUNT,
-               "leave ATT buffers for responses, or sending a notification can wait for one" );
+/**
+ * @brief ATT buffers kept for everything but the data point: the Battery and
+ *        calibration notifications, responses to requests and the MTU exchange.
+ *        A notification from the measurement thread waits for a buffer if the
+ *        pool is empty, so the data point must never be able to empty it.
+ */
+constexpr int reserved_att_buffers = 4;
+static_assert( CONFIG_APP_BLE_SVC_MAX_QUEUED_NOTIFICATIONS + reserved_att_buffers <= CONFIG_BT_ATT_TX_COUNT,
+               "BT_ATT_TX_COUNT must cover the queued data point notifications and the reserve" );
 
 K_MUTEX_DEFINE( ble_svc_client_mutex );
 
@@ -76,7 +83,7 @@ public:
     {
     }
 
-    [[nodiscard]] fw::Result<> send( std::span<const std::uint8_t> packet ) override;
+    [[nodiscard]] fw::Result<> send_progressor( std::span<const std::uint8_t> packet ) override;
     [[nodiscard]] std::uint16_t att_mtu() const override;
     [[nodiscard]] fw::Result<> set_streaming( bool streaming ) override;
     [[nodiscard]] fw::Result<> disconnect() override;
@@ -107,7 +114,7 @@ std::pair<bt_conn *, std::uintptr_t> Client::acquire() const
 
 void notification_sent( bt_conn * /*conn*/, void *user_data );
 
-fw::Result<> Client::send( std::span<const std::uint8_t> packet )
+fw::Result<> Client::send_progressor( std::span<const std::uint8_t> packet )
 {
     auto [conn, generation] = acquire();
     if( conn == nullptr ) {

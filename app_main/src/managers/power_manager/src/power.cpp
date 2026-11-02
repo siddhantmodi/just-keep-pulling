@@ -58,7 +58,7 @@ fw::Result<> Power::check_battery()
 
     LOG_WRN( "battery low: %u mV, powering off", static_cast<unsigned>( status->millivolts ) );
     auto const warning = progressor::encode_low_power_warning();
-    if( auto ret = client_.send( warning.bytes() ); !ret && ret.error() != std::errc::not_connected ) {
+    if( auto ret = client_.send_progressor( warning.bytes() ); !ret && ret.error() != std::errc::not_connected ) {
         LOG_WRN( "low-power warning not sent: %d", fw::err::to_zephyr( ret.error() ) );
     }
     state_ = State::powering_off;

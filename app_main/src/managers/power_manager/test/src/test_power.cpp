@@ -34,7 +34,7 @@ class PowerTest : public testing::Test
 protected:
     PowerTest()
     {
-        ON_CALL( client_, send( _ ) )
+        ON_CALL( client_, send_progressor( _ ) )
             .WillByDefault(
                 [this]( std::span<const std::uint8_t> bytes )
                 {
@@ -130,7 +130,7 @@ TEST_F( PowerTest, PowersOffWithoutAClient )
 {
     battery_reads( low );
     EXPECT_CALL( pmic_, read_battery() ).Times( 2 );
-    ON_CALL( client_, send( _ ) ).WillByDefault( Return( std::unexpected( std::errc::not_connected ) ) );
+    ON_CALL( client_, send_progressor( _ ) ).WillByDefault( Return( std::unexpected( std::errc::not_connected ) ) );
 
     ASSERT_TRUE( power_.check() );
     ASSERT_TRUE( power_.check() );
