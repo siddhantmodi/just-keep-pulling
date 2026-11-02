@@ -29,7 +29,7 @@ protected:
 
     void TearDown() override
     {
-        for( const char *key : { "test/factor", "test/point", "test/id", "test/id_suffix" } ) {
+        for( const char *key : { "test/factor", "test/point", "test/id", "test/id_suffix", "test/id/backup" } ) {
             (void)fw::settings::erase( key );
         }
     }
@@ -94,6 +94,17 @@ TEST_F( SettingsTest, KeysWithACommonPrefixAreSeparate )
 
     EXPECT_EQ( *fw::settings::load<Id>( "test/id" ), id );
     EXPECT_EQ( *fw::settings::load<std::uint8_t>( "test/id_suffix" ), 9 );
+}
+
+TEST_F( SettingsTest, LoadIgnoresKeysBelowIt )
+{
+    ASSERT_TRUE( fw::settings::save( "test/id/backup", std::uint8_t{ 7 } ) );
+
+    // Only a key below "test/id" is stored: "test/id" itself is not.
+    EXPECT_EQ( fw::settings::load<std::uint8_t>( "test/id" ).error(), std::errc::no_such_file_or_directory );
+
+    ASSERT_TRUE( fw::settings::save( "test/id", std::uint8_t{ 3 } ) );
+    EXPECT_EQ( *fw::settings::load<std::uint8_t>( "test/id" ), 3 );
 }
 
 } // namespace
