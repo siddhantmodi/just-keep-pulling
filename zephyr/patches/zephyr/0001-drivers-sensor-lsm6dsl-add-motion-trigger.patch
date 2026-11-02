@@ -6,7 +6,8 @@ of the acceleration exceeding a threshold. SENSOR_ATTR_SLOPE_TH sets the
 threshold (in steps of 1/64 of the accelerometer's full scale) and
 SENSOR_ATTR_SLOPE_DUR the samples it must last. The wake-up interrupt is
 routed to INT1 while a motion handler is set, so INT1 can also wake a SoC
-from a low-power state.
+from a low-power state. It is latched (TAP_CFG LIR), so a handler that runs
+late still sees the event; the driver's read of WAKE_UP_SRC releases it.
 
 Interrupt sources are now routed to INT1 only while their trigger has a
 handler. Data-ready was routed at init, which kept INT1 toggling at the
@@ -102,10 +103,10 @@ index 524cc6bd3..8421dbe5c 100644
  #endif /* ZEPHYR_DRIVERS_SENSOR_LSM6DSL_LSM6DSL_H_ */
 diff --git a/drivers/sensor/st/lsm6dsl/lsm6dsl_emul.c b/drivers/sensor/st/lsm6dsl/lsm6dsl_emul.c
 new file mode 100644
-index 000000000..f58de58f9
+index 000000000..a2b159f25
 --- /dev/null
 +++ b/drivers/sensor/st/lsm6dsl/lsm6dsl_emul.c
-@@ -0,0 +1,213 @@
+@@ -0,0 +1,222 @@
 +/*
 + * Copyright (c) 2026 Siddhant Modi
 + * SPDX-License-Identifier: Apache-2.0
@@ -151,8 +152,10 @@ index 000000000..f58de58f9
 +
 +static bool lsm6dsl_emul_int1_active(const struct lsm6dsl_emul_data *data)
 +{
++	/* Only a latched event holds INT1; otherwise it is a pulse (lsm6dsl_emul_wake_up) */
 +	return (data->reg[LSM6DSL_REG_WAKE_UP_SRC] & LSM6DSL_MASK_WAKE_UP_SRC_WU_IA) != 0U &&
-+	       (data->reg[LSM6DSL_REG_MD1_CFG] & LSM6DSL_MASK_MD1_CFG_INT1_WU) != 0U;
++	       (data->reg[LSM6DSL_REG_MD1_CFG] & LSM6DSL_MASK_MD1_CFG_INT1_WU) != 0U &&
++	       (data->reg[LSM6DSL_REG_TAP_CFG] & LSM6DSL_MASK_TAP_CFG_LIR) != 0U;
 +}
 +
 +/* Drive INT1 only when its level changes: until then the driver may not have configured
@@ -278,6 +281,7 @@ index 000000000..f58de58f9
 +{
 +	struct lsm6dsl_emul_data *data = target->data;
 +	bool int1 = false;
++	bool pulse = false;
 +
 +	K_SPINLOCK(&data->lock) {
 +		bool accel_on =
@@ -288,10 +292,16 @@ index 000000000..f58de58f9
 +		if (accel_on && int_enabled) {
 +			data->reg[LSM6DSL_REG_WAKE_UP_SRC] =
 +				LSM6DSL_MASK_WAKE_UP_SRC_WU_IA | LSM6DSL_MASK_WAKE_UP_SRC_X_WU;
++			pulse = (data->reg[LSM6DSL_REG_MD1_CFG] &
++				 LSM6DSL_MASK_MD1_CFG_INT1_WU) != 0U &&
++				(data->reg[LSM6DSL_REG_TAP_CFG] & LSM6DSL_MASK_TAP_CFG_LIR) == 0U;
 +		}
 +		int1 = lsm6dsl_emul_int1_active(data);
 +	}
 +
++	if (pulse) {
++		lsm6dsl_emul_update_int1(target, true);
++	}
 +	lsm6dsl_emul_update_int1(target, int1);
 +}
 +
@@ -321,10 +331,10 @@ index 000000000..f58de58f9
 +DT_INST_FOREACH_STATUS_OKAY(LSM6DSL_EMUL)
 diff --git a/drivers/sensor/st/lsm6dsl/lsm6dsl_emul.h b/drivers/sensor/st/lsm6dsl/lsm6dsl_emul.h
 new file mode 100644
-index 000000000..0940de152
+index 000000000..f8d81a1aa
 --- /dev/null
 +++ b/drivers/sensor/st/lsm6dsl/lsm6dsl_emul.h
-@@ -0,0 +1,54 @@
+@@ -0,0 +1,55 @@
 +/*
 + * Copyright (c) 2026 Siddhant Modi
 + * SPDX-License-Identifier: Apache-2.0
@@ -368,7 +378,8 @@ index 000000000..0940de152
 + *
 + * Takes effect only while the accelerometer is on and interrupts are enabled,
 + * as on the device: sets the wake-up source register and, if the wake-up
-+ * interrupt is routed to INT1, drives INT1 high until the source is read.
++ * interrupt is routed to INT1, drives INT1 high: until the source is read if
++ * the interrupt is latched (TAP_CFG LIR), otherwise as a pulse.
 + *
 + * @param target The target emulator
 + */
@@ -380,7 +391,7 @@ index 000000000..0940de152
 +
 +#endif /* ZEPHYR_DRIVERS_SENSOR_LSM6DSL_LSM6DSL_EMUL_H_ */
 diff --git a/drivers/sensor/st/lsm6dsl/lsm6dsl_trigger.c b/drivers/sensor/st/lsm6dsl/lsm6dsl_trigger.c
-index 0c3b1d377..167e56ed7 100644
+index 0c3b1d377..6bd5a1371 100644
 --- a/drivers/sensor/st/lsm6dsl/lsm6dsl_trigger.c
 +++ b/drivers/sensor/st/lsm6dsl/lsm6dsl_trigger.c
 @@ -41,14 +41,35 @@ static inline void handle_irq(const struct device *dev)
@@ -398,10 +409,10 @@ index 0c3b1d377..167e56ed7 100644
 +static int route_wake_up(const struct device *dev, bool enable)
 +{
 +	struct lsm6dsl_data *drv_data = dev->data;
++	/* Latched, so a late handler still sees the event: reading WAKE_UP_SRC clears it */
++	uint8_t mask = LSM6DSL_MASK_TAP_CFG_INTERRPUTS_ENABLE | LSM6DSL_MASK_TAP_CFG_LIR;
 +
-+	if (drv_data->hw_tf->update_reg(dev, LSM6DSL_REG_TAP_CFG,
-+					LSM6DSL_MASK_TAP_CFG_INTERRPUTS_ENABLE,
-+					enable ? LSM6DSL_MASK_TAP_CFG_INTERRPUTS_ENABLE : 0) < 0) {
++	if (drv_data->hw_tf->update_reg(dev, LSM6DSL_REG_TAP_CFG, mask, enable ? mask : 0) < 0) {
 +		return -EIO;
 +	}
 +
@@ -615,10 +626,10 @@ index 000000000..eeb6aea27
 +CONFIG_LSM6DSL_TRIGGER_GLOBAL_THREAD=y
 diff --git a/tests/drivers/sensor/lsm6dsl/src/main.c b/tests/drivers/sensor/lsm6dsl/src/main.c
 new file mode 100644
-index 000000000..58b4821b8
+index 000000000..a5b95e5e3
 --- /dev/null
 +++ b/tests/drivers/sensor/lsm6dsl/src/main.c
-@@ -0,0 +1,166 @@
+@@ -0,0 +1,168 @@
 +/*
 + * Copyright (c) 2026 Siddhant Modi
 + * SPDX-License-Identifier: Apache-2.0
@@ -739,10 +750,12 @@ index 000000000..58b4821b8
 +	zassert_ok(sensor_trigger_set(dev, &motion_trig, motion_handler));
 +	zassert_true(get_reg(LSM6DSL_REG_MD1_CFG) & LSM6DSL_MASK_MD1_CFG_INT1_WU);
 +	zassert_true(get_reg(LSM6DSL_REG_TAP_CFG) & LSM6DSL_MASK_TAP_CFG_INTERRPUTS_ENABLE);
++	zassert_true(get_reg(LSM6DSL_REG_TAP_CFG) & LSM6DSL_MASK_TAP_CFG_LIR, "wake-up must latch");
 +	zassert_equal(get_reg(LSM6DSL_REG_INT1_CTRL), 0, "data ready must stay off INT1");
 +
 +	zassert_ok(sensor_trigger_set(dev, &motion_trig, NULL));
 +	zassert_false(get_reg(LSM6DSL_REG_MD1_CFG) & LSM6DSL_MASK_MD1_CFG_INT1_WU);
++	zassert_false(get_reg(LSM6DSL_REG_TAP_CFG) & LSM6DSL_MASK_TAP_CFG_LIR);
 +}
 +
 +ZTEST(lsm6dsl, test_motion_calls_handler)

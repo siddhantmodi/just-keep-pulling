@@ -9,7 +9,7 @@
 
 patches:
   - path: zephyr/0001-drivers-sensor-lsm6dsl-add-motion-trigger.patch
-    sha256sum: 8a88df38a1f9b006d07a6e50674a1c0b9e1da400ce869b57cc2fc737e0bce47d
+    sha256sum: 19f40f519664b5e072b27a0279ca00753b214264bd429bd04d5c90def678d96d
     module: deps/zephyr
     author: Siddhant Modi
     email: siddhant.modi@gmail.com
