@@ -4,9 +4,10 @@
  *
  * Pure functions, no Zephyr. Clients write commands to the control point
  * characteristic and receive responses as data point notifications. Both use
- * the same format: a 1-byte code, a 1-byte length and the value; the length
- * and value are only present when there is a payload. Multi-byte values are
- * little-endian.
+ * the same format: a 1-byte code, a 1-byte length and the value. A command's
+ * length and value may be left out, since none takes a payload; a response
+ * always carries the length, 0 when it has no value (e.g. the low-power
+ * warning, 04 00). Multi-byte values are little-endian.
  *
  * Covers Tindeq's public API (tare, start/stop measurement, shutdown, battery
  * voltage) plus the two commands the Tindeq app uses to identify a device

@@ -166,6 +166,21 @@ TEST_F( LoadCellTest, TwoPointsFitAndSaveTheFactor )
     EXPECT_FLOAT_EQ( *saved, load_cell_.calibration_factor() );
 }
 
+TEST_F( LoadCellTest, ARepeatedLoadWaitsForAnotherBeforeFitting )
+{
+    ASSERT_TRUE( load_cell_.init() );
+    set_load( 0.0 );
+    ASSERT_TRUE( load_cell_.add_calibration_point( 0.0F ) );
+
+    EXPECT_EQ( load_cell_.add_calibration_point( 0.0F ), 2U );
+    EXPECT_FLOAT_EQ( load_cell_.calibration_factor(), calibration::default_factor );
+    EXPECT_FALSE( fw::settings::load<float>( load_cell_svc::factor_key ) );
+
+    set_load( 20.0 );
+    EXPECT_EQ( load_cell_.add_calibration_point( 20.0F ), 3U );
+    EXPECT_NEAR( load_cell_.calibration_factor(), 0.109F, 1e-5F );
+}
+
 TEST_F( LoadCellTest, FailedFitClearsPointsAndKeepsTheFactor )
 {
     ASSERT_TRUE( load_cell_.init() );

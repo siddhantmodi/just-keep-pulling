@@ -31,7 +31,7 @@ A malformed write gets an ATT error: Invalid Attribute Value Length for a wrong 
 1. Connect to `Progressor_NNNN`, open the JustKeepPulling service and enable notifications on **Calibration**.
 2. Optionally start over: write `01` to **Reset calibration** (back to the default factor; the saved one is erased).
 3. With nothing on the load cell, write `00 00 00 00` (0 kg) to **Add calibration point (kg)**. Calibration notifies `01` (measuring, about 1.25 s, keep it still), then `00` with one point.
-4. Hang a known load and write its weight as a little-endian float: 5 kg `00 00 A0 40`, 10 kg `00 00 20 41`, 20 kg `00 00 A0 41` (any other: `struct.pack("<f", kg).hex()` in Python). From the second point on, the factor is refitted and saved.
+4. Hang a known load and write its weight as a little-endian float: 5 kg `00 00 A0 40`, 10 kg `00 00 20 41`, 20 kg `00 00 A0 41` (any other: `struct.pack("<f", kg).hex()` in Python). From the second different load on, the factor is refitted and saved; a repeated weight (e.g. 0 kg twice) is just kept.
 5. Add more loads for a better fit (up to 20 points; status `02` means full, reset to start over). Status `03` means the points gave an implausible factor: they were cleared and the previous factor kept.
 
 Points are kept in RAM until a reboot or reset, as in Crimpdeq; the factor survives reboots.

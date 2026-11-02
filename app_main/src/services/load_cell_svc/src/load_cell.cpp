@@ -177,11 +177,13 @@ fw::Result<std::size_t> LoadCell::add_calibration_point( float kg )
     points_[point_count_++] = calibration::Point{ .raw = *average, .kg = kg };
     LOG_INF( "calibration point %u: %d codes at %d g", static_cast<unsigned>( point_count_ ), static_cast<int>( *average ),
              static_cast<int>( kg * 1000.0F ) );
-    if( point_count_ < 2 ) {
+    auto const points = std::span{ points_ }.first( point_count_ );
+    // A slope needs two different loads: until then, keep the points (e.g. 0 kg measured twice).
+    if( !calibration::has_two_loads( points ) ) {
         return point_count_;
     }
 
-    auto factor = calibration::fit_factor( std::span{ points_ }.first( point_count_ ) );
+    auto factor = calibration::fit_factor( points );
     if( !factor ) {
         LOG_ERR( "calibration fit failed (%d), points cleared", fw::err::to_zephyr( factor.error() ) );
         point_count_ = 0;

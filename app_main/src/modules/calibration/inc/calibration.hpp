@@ -41,6 +41,9 @@ inline constexpr float factor_tolerance = 10.0F;
     return static_cast<float>( static_cast<std::int64_t>( raw ) - tare ) * factor / 1000.0F;
 }
 
+/** @brief Whether the points hold at least two different loads, which a slope needs. */
+[[nodiscard]] bool has_two_loads( std::span<const Point> points ) noexcept;
+
 /**
  * @brief Least-squares factor for calibration points.
  *
@@ -48,8 +51,9 @@ inline constexpr float factor_tolerance = 10.0F;
  * no-load reading: the mean of the zero-kg points, or the mean of all points
  * when there are none.
  *
- * Fails with invalid_argument for fewer than two points or points with
- * (nearly) the same raw code, and result_out_of_range for an implausible factor.
+ * Fails with invalid_argument for points without two different loads (see
+ * has_two_loads()) or with exactly the same raw code, and result_out_of_range
+ * for an implausible factor, which includes readings that barely change.
  */
 [[nodiscard]] fw::Result<float> fit_factor( std::span<const Point> points ) noexcept;
 

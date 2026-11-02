@@ -110,6 +110,25 @@ TEST( FitFactorTest, RejectsFewerThanTwoPoints )
     EXPECT_EQ( calibration::fit_factor( {} ).error(), std::errc::invalid_argument );
 }
 
+TEST( HasTwoLoadsTest, NeedsTwoDifferentWeights )
+{
+    std::array const zeros{ Point{ .raw = 1000.0, .kg = 0.0F }, Point{ .raw = 1010.0, .kg = 0.0F } };
+    std::array const loads{ Point{ .raw = 1000.0, .kg = 0.0F }, Point{ .raw = 1010.0, .kg = 0.0F }, Point{ .raw = 9000.0, .kg = 1.0F } };
+
+    EXPECT_FALSE( calibration::has_two_loads( {} ) );
+    EXPECT_FALSE( calibration::has_two_loads( std::span{ zeros }.first( 1 ) ) );
+    EXPECT_FALSE( calibration::has_two_loads( zeros ) );
+    EXPECT_TRUE( calibration::has_two_loads( loads ) );
+}
+
+TEST( FitFactorTest, RejectsASingleLoad )
+{
+    // Two readings at 0 kg: no slope to fit.
+    std::array const points{ Point{ .raw = 1000.0, .kg = 0.0F }, Point{ .raw = 1010.0, .kg = 0.0F } };
+
+    EXPECT_EQ( calibration::fit_factor( points ).error(), std::errc::invalid_argument );
+}
+
 TEST( FitFactorTest, RejectsPointsWithTheSameReading )
 {
     // The load changed but the reading did not: a wiring fault.

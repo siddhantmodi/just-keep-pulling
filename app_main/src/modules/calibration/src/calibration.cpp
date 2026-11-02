@@ -7,6 +7,7 @@
 
 #include "calibration.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <expected>
 #include <limits>
@@ -45,6 +46,11 @@ fw::Result<Mean> mean( std::span<const Point> points, bool zero_kg_only ) noexce
 
 } // namespace
 
+bool has_two_loads( std::span<const Point> points ) noexcept
+{
+    return std::ranges::any_of( points, [&points]( const Point &point ) { return point.kg != points.front().kg; } );
+}
+
 bool is_plausible( float factor ) noexcept
 {
     float const magnitude = std::fabs( factor );
@@ -53,7 +59,7 @@ bool is_plausible( float factor ) noexcept
 
 fw::Result<float> fit_factor( std::span<const Point> points ) noexcept
 {
-    if( points.size() < 2 ) {
+    if( !has_two_loads( points ) ) {
         return std::unexpected( std::errc::invalid_argument );
     }
 

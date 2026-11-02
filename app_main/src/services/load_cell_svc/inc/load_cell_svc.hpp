@@ -64,8 +64,9 @@ public:
 
     /**
      * @brief Measure a calibration point under @p kg (average over 1.25 s at
-     *        90 SPS), then restore the previous sampling. From the second point
-     *        on, refit the factor and save it. Returns the number of points.
+     *        90 SPS), then restore the previous sampling. Once the points hold
+     *        two different loads, refit the factor and save it. Returns the
+     *        number of points.
      *
      * Fails with invalid_argument for a negative or non-finite weight and
      * no_buffer_space after 20 points. A failed fit (see calibration::fit_factor)
