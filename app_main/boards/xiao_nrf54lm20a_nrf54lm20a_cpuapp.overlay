@@ -52,7 +52,7 @@
 };
 
 &pmic_charger {
-	/* 2000 mAh LiPo: 500 mA (0.25C) to 4.2 V, within the 500 mA USB budget. */
+	/* 1000 mAh LiPo (JLJLUP): 500 mA (0.5C, a standard LiPo charge rate) to 4.2 V, within the 500 mA USB budget. */
 	term-microvolt = <4200000>;
 	current-microamp = <500000>;
 	/* Seeed's 10 kOhm NTC (beta 3380). To confirm on the schematic: with no
