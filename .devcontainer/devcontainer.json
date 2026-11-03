@@ -15,6 +15,7 @@
     "workspaceFolder": "/home/user/workspace",
     "initializeCommand": "mkdir -p ${localEnv:HOME}/.claude/projects",
     "postCreateCommand": "sudo chown $(id -u):$(id -g) /home/user/workspace /home/user/.claude/projects && ./${localWorkspaceFolderBasename}/.devcontainer/link_claude_sessions.sh && sudo chown -R $(id -u):$(id -g) /opt/python/venv && ./${localWorkspaceFolderBasename}/west_setup.sh",
+    "postStartCommand": "sudo ./${localWorkspaceFolderBasename}/.devcontainer/start_udev.sh",
     "mounts": [
         "source=${localWorkspaceFolderBasename}-west-${devcontainerId},target=/home/user/workspace,type=volume",
         "source=${localEnv:HOME}/.ssh,target=/home/user/.ssh,type=bind",
