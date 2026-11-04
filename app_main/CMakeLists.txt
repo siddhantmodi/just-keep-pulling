@@ -6,7 +6,9 @@ find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 project(app_main)
 
 # Application code builds warning-free; dependencies keep their own flags.
-target_compile_options(app PRIVATE -Werror)
+# -Wno-psabi: GCC's note that Arm argument passing for some types (e.g. std::span)
+# changed in GCC 7.1. It only matters when linking objects built by GCC 6 or older.
+target_compile_options(app PRIVATE -Werror -Wno-psabi)
 
 target_sources(app PRIVATE src/main.cpp)
 
