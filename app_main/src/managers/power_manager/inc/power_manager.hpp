@@ -10,7 +10,7 @@
  *
  * It also tracks inactivity (commands, configuration requests, connections,
  * a measurement starting or stopping, pulls during a measurement and motion
- * are activity): after 4 minutes idle, or 30 with a client connected, it
+ * are activity): after 4 minutes idle, or 10 with a client connected, it
  * disconnects the client and sleeps (System OFF) until the device is moved.
  *
  * And it drives the status LED, as Crimpdeq: blue without a client, green

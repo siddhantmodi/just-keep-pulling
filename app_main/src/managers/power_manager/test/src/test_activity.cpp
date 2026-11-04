@@ -26,7 +26,7 @@ using testing::NiceMock;
 using testing::Return;
 using testing::StrictMock;
 
-constexpr power_manager::IdleTimeouts timeouts{ .disconnected = 240s, .connected = 1800s };
+constexpr power_manager::IdleTimeouts timeouts{ .disconnected = 240s, .connected = 600s };
 
 class ActivityTest : public testing::Test
 {
@@ -128,7 +128,7 @@ TEST_F( ActivityTest, AMeasurementNobodyPullsOnIdlesLikeAConnection )
 {
     activity_.on_client_connection( true );
     activity_.on_measurement();
-    idle_for( 1790s );
+    idle_for( 590s );
     EXPECT_CALL( client_, disconnect() ).WillOnce( Return( fw::Result<>{} ) );
 
     idle_for( 10s );
@@ -137,14 +137,14 @@ TEST_F( ActivityTest, AMeasurementNobodyPullsOnIdlesLikeAConnection )
 TEST_F( ActivityTest, WaitsLongerWithAClient )
 {
     activity_.on_client_connection( true );
-    idle_for( 1790s ); // past the 240 s without a client
-    EXPECT_EQ( activity_.idle(), 1790s );
+    idle_for( 590s ); // past the 240 s without a client
+    EXPECT_EQ( activity_.idle(), 590s );
 }
 
 TEST_F( ActivityTest, DisconnectsTheClientThenSleeps )
 {
     activity_.on_client_connection( true );
-    idle_for( 1790s );
+    idle_for( 590s );
 
     EXPECT_CALL( client_, disconnect() ).WillOnce( Return( fw::Result<>{} ) );
     ASSERT_TRUE( activity_.check() );
@@ -157,7 +157,7 @@ TEST_F( ActivityTest, DisconnectsTheClientThenSleeps )
 TEST_F( ActivityTest, AReconnectionCancelsTheSleep )
 {
     activity_.on_client_connection( true );
-    idle_for( 1790s );
+    idle_for( 590s );
     EXPECT_CALL( client_, disconnect() ).WillOnce( Return( fw::Result<>{} ) );
     ASSERT_TRUE( activity_.check() );
     activity_.on_client_connection( false );
@@ -170,7 +170,7 @@ TEST_F( ActivityTest, AReconnectionCancelsTheSleep )
 TEST_F( ActivityTest, MotionWhileDisconnectingCancelsTheSleep )
 {
     activity_.on_client_connection( true );
-    idle_for( 1790s );
+    idle_for( 590s );
     EXPECT_CALL( client_, disconnect() ).WillOnce( Return( fw::Result<>{} ) );
     ASSERT_TRUE( activity_.check() );
 
