@@ -44,6 +44,12 @@ inline constexpr std::array all_sample_rates{ SampleRate::sps20,  SampleRate::sp
     return std::to_underlying( rate );
 }
 
+/** @brief How long a read waits for the next conversion: two periods plus a margin for scheduling. */
+[[nodiscard]] constexpr std::chrono::microseconds read_timeout( SampleRate rate ) noexcept
+{
+    return std::chrono::microseconds{ ( 2'000'000 / samples_per_second( rate ) ) + 20'000 };
+}
+
 /** @brief The rate for a number of samples per second, e.g. from settings or a user. Fails with not_supported. */
 [[nodiscard]] constexpr fw::Result<SampleRate> to_sample_rate( std::uint16_t samples_per_second ) noexcept
 {

@@ -441,6 +441,16 @@ TEST_F( MeasurementTest, ShutdownStopsMeasuringAndDisconnects )
     EXPECT_TRUE( sent_.empty() );
 }
 
+TEST_F( MeasurementTest, ShutdownDisconnectsEvenIfTheLoadCellFailsToStop )
+{
+    start_measuring();
+    EXPECT_CALL( load_cell_, stop() ).WillOnce( Return( std::unexpected( std::errc::io_error ) ) );
+    EXPECT_CALL( client_, disconnect() ).WillOnce( Return( fw::Result<>{} ) );
+
+    EXPECT_EQ( measurement_.handle( command( Opcode::shutdown ) ), std::unexpected( std::errc::io_error ) );
+    EXPECT_FALSE( measurement_.measuring() );
+}
+
 TEST_F( MeasurementTest, DisconnectionStopsMeasuringWithoutSending )
 {
     start_measuring();

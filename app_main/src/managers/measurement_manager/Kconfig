@@ -21,8 +21,8 @@ config APP_MEASUREMENT_MANAGER_PRIORITY
 	default 2
 	help
 	  Above the other application threads, so sampling keeps up at high
-	  rates. The ADC driver buffers samples meanwhile, and counts the ones
-	  it has to overwrite.
+	  rates. While the thread is busy the ADC keeps only its latest
+	  conversion; the driver counts the ones overwritten.
 
 config APP_MEASUREMENT_MANAGER_QUEUE_DEPTH
 	int "Measurement manager event queue depth"

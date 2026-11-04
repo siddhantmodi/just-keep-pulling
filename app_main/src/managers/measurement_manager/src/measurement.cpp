@@ -27,12 +27,6 @@ std::uint32_t period_us( hal::SampleRate rate )
     return 1'000'000U / hal::samples_per_second( rate );
 }
 
-/** @brief Long enough for the next conversion: two periods plus a margin for scheduling. */
-std::chrono::microseconds read_timeout( hal::SampleRate rate )
-{
-    return std::chrono::microseconds{ ( 2 * period_us( rate ) ) + 20'000 };
-}
-
 /** @brief A failure that only means nobody is listening: the client is gone or not subscribed. */
 bool no_listener( std::errc error )
 {
@@ -80,12 +74,13 @@ fw::Result<> Measurement::on_command( const progressor::Command &command )
     case Opcode::get_app_version:
         return reply( progressor::encode_app_version( app_version ) );
     case Opcode::shutdown:
+    {
         // As Crimpdeq: end the session and keep advertising. Power-off is the switch.
         LOG_INF( "shutdown requested, disconnecting" );
-        if( auto stopped = stop_measurement( false ); !stopped ) {
-            return stopped;
-        }
-        return client_.disconnect();
+        auto stopped = stop_measurement( false );
+        auto disconnected = client_.disconnect();
+        return stopped ? disconnected : stopped;
+    }
     case Opcode::sample_battery:
     {
         // The power manager's latest reading: measuring here would compete with it for the PMIC.
@@ -230,7 +225,7 @@ fw::Result<> Measurement::sample()
     if( !rate_ ) {
         return std::unexpected( std::errc::operation_not_permitted );
     }
-    auto sample = load_cell_.read( read_timeout( *rate_ ) );
+    auto sample = load_cell_.read( hal::read_timeout( *rate_ ) );
     if( !sample ) {
         LOG_ERR( "load cell read failed: %d", fw::err::to_zephyr( sample.error() ) );
         if( ++read_failures_ >= max_read_failures ) {

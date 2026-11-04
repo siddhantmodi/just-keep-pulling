@@ -65,8 +65,7 @@ void on_message( const zbus_channel *chan )
     }
 
     if( !events.put( event, K_NO_WAIT ) ) {
-        std::uint32_t const dropped = dropped_events.fetch_add( 1, std::memory_order_relaxed ) + 1;
-        LOG_WRN( "event queue full, dropped event %u (%u dropped so far)", static_cast<unsigned>( event.type ), static_cast<unsigned>( dropped ) );
+        dropped_events.fetch_add( 1, std::memory_order_relaxed );
     }
 }
 
@@ -82,11 +81,12 @@ void run( void * /*p1*/, void * /*p2*/, void * /*p3*/ )
             if( auto ret = measurement().handle( *event ); !ret ) {
                 LOG_ERR( "event %u failed: %d", static_cast<unsigned>( event->type ), fw::err::to_zephyr( ret.error() ) );
             }
-            continue;
-        }
-        if( measurement().measuring() ) {
+        } else if( measurement().measuring() ) {
             // Failures are logged by the manager, which stops measuring if they persist.
             std::ignore = measurement().sample();
+        }
+        if( auto const dropped = dropped_events.exchange( 0, std::memory_order_relaxed ); dropped != 0 ) {
+            LOG_WRN( "event queue full, %u events dropped", static_cast<unsigned>( dropped ) );
         }
     }
 }

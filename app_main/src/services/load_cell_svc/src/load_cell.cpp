@@ -20,17 +20,6 @@ LOG_MODULE_REGISTER( load_cell_svc, CONFIG_APP_LOAD_CELL_SVC_LOG_LEVEL );
 namespace load_cell_svc
 {
 
-namespace
-{
-
-/** @brief Long enough for the next conversion: two periods plus a margin for scheduling. */
-std::chrono::microseconds read_timeout( hal::SampleRate rate )
-{
-    return std::chrono::microseconds{ ( 2'000'000 / hal::samples_per_second( rate ) ) + 20'000 };
-}
-
-} // namespace
-
 fw::Result<> LoadCell::init()
 {
     if( auto ret = adc_.init(); !ret ) {
@@ -119,7 +108,7 @@ fw::Result<double> LoadCell::average_raw( hal::SampleRate rate, std::chrono::mil
     }
 
     auto const count = std::max<std::int64_t>( 1, ( std::int64_t{ hal::samples_per_second( rate ) } * duration.count() ) / 1000 );
-    auto const timeout = read_timeout( rate );
+    auto const timeout = hal::read_timeout( rate );
     std::int64_t sum = 0;
     fw::Result<> result{};
     for( std::int64_t i = 0; i < count && result; ++i ) {
