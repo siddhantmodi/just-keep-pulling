@@ -34,11 +34,12 @@ int main()
         LOG_ERR( "identity init failed: %d", fw::err::to_zephyr( ret.error() ) );
     }
 
-    if( auto ret = load_cell_svc::load_cell().init(); !ret ) {
-        LOG_ERR( "load cell init failed: %d", fw::err::to_zephyr( ret.error() ) );
-        return 0;
+    auto const load_cell_ready = load_cell_svc::load_cell().init();
+    if( !load_cell_ready ) {
+        LOG_ERR( "load cell init failed: %d", fw::err::to_zephyr( load_cell_ready.error() ) );
+    } else {
+        LOG_INF( "calibration: %ld ug per code", std::lround( load_cell_svc::load_cell().calibration_factor() * 1e6F ) );
     }
-    LOG_INF( "calibration: %ld ug per code", std::lround( load_cell_svc::load_cell().calibration_factor() * 1e6F ) );
 
     // Without the LED the device still works; it just doesn't show its state.
     if( auto ret = led_svc::led().init(); !ret ) {
@@ -51,16 +52,22 @@ int main()
     }
 
     // Without the PMIC the device still measures; only battery reports and low-battery power-off are lost.
-    if( auto ret = pmic_svc::pmic().init(); !ret ) {
-        LOG_ERR( "PMIC init failed: %d", fw::err::to_zephyr( ret.error() ) );
-    } else if( auto started = power_manager::start(); !started ) {
+    auto const pmic_ready = pmic_svc::pmic().init();
+    if( !pmic_ready ) {
+        LOG_ERR( "PMIC init failed: %d", fw::err::to_zephyr( pmic_ready.error() ) );
+    }
+    if( auto started = power_manager::start( pmic_ready.has_value() ); !started ) {
         LOG_ERR( "first battery reading failed: %d", fw::err::to_zephyr( started.error() ) );
     }
 
-    // Before Bluetooth, so the manager observes the first command.
-    if( auto ret = measurement_manager::start(); !ret ) {
-        LOG_ERR( "measurement manager start failed: %d", fw::err::to_zephyr( ret.error() ) );
-        return 0;
+    // Without the load cell there is nothing to measure: the device still
+    // advertises, so it can be found (device information, battery), but Progressor commands
+    // and calibration requests go unanswered. Before Bluetooth, so the manager
+    // observes the first command.
+    if( load_cell_ready ) {
+        if( auto ret = measurement_manager::start(); !ret ) {
+            LOG_ERR( "measurement manager start failed: %d", fw::err::to_zephyr( ret.error() ) );
+        }
     }
 
     if( auto ret = ble_svc::init(); !ret ) {

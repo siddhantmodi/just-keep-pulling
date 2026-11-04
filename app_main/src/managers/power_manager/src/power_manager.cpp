@@ -206,7 +206,7 @@ K_THREAD_DEFINE( power_manager_thread, CONFIG_APP_POWER_MANAGER_STACK_SIZE, run,
 namespace power_manager
 {
 
-fw::Result<> start()
+fw::Result<> start( bool pmic_ready )
 {
     // Built here, before the thread runs. The first battery check also runs
     // here, so the battery channel holds a reading before anyone asks.
@@ -214,8 +214,11 @@ fw::Result<> start()
     if( auto ret = indicator().start(); !ret ) {
         LOG_WRN( "status LED not set: %d", fw::err::to_zephyr( ret.error() ) );
     }
-    auto first = power().check();
-    schedule_battery_check();
+    fw::Result<> first{};
+    if( pmic_ready ) {
+        first = power().check();
+        schedule_battery_check();
+    }
     auto const interval = K_SECONDS( activity_check_interval.count() );
     k_timer_start( &power_manager_activity_timer, interval, interval );
     k_thread_start( power_manager_thread );

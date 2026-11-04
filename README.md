@@ -53,7 +53,7 @@ docs/architecture.md  Design rules, layers, why C++, and when to revisit them
 docs/app_main.md      app_main's class diagram (Mermaid): interfaces, implementations, modules, drivers
 app_main/             The dynamometer firmware (XIAO nRF54LM20A; native_sim for tests)
   boards/             Devicetree overlays per board (aliases load-cell-adc, pmic-charger, pmic-regulators, motion-sensor, status-led-*: the real parts or emulated ones)
-  debug.conf          Debug build variant: adds the shell
+  debug.conf          Debug build variant: adds logging and the shell
   src/main.cpp
   src/channels/       zbus channels: the message contracts shared by every layer
   src/managers/       Own a thread and an event queue (measurement_manager, power_manager)
@@ -91,11 +91,11 @@ The west workspace topdir is the **parent** of this repo; dependencies live in `
 From the workspace topdir (`/home/user/workspace` in the devcontainer):
 
 ```sh
-# Release build (no shell)
+# Release build (no logging, no shell)
 west build -b xiao_nrf54lm20a/nrf54lm20a/cpuapp -d build/app_main just-keep-pulling/app_main
 west flash -d build/app_main
 
-# Debug build: adds the shell on the console UART, with "jkp id", "jkp rate" and "jkp battery" commands
+# Debug build: adds logging and the shell on the console UART, with "jkp id", "jkp rate" and "jkp battery" commands
 west build -b xiao_nrf54lm20a/nrf54lm20a/cpuapp -d build/app_main-debug just-keep-pulling/app_main -- -DEXTRA_CONF_FILE=debug.conf
 ```
 

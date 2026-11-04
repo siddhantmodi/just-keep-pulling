@@ -86,7 +86,7 @@ int cmd_rate_set( const shell *sh, size_t /*argc*/, char **argv )
 
 int cmd_battery( const shell *sh, size_t /*argc*/, char ** /*argv*/ )
 {
-    auto battery = channels::battery.read( K_MSEC( 100 ) );
+    auto battery = channels::battery.read( channels::lock_timeout );
     if( !battery ) {
         shell_error( sh, "no reading: %d", fw::err::to_zephyr( battery.error() ) );
         return fw::err::to_zephyr( battery.error() );

@@ -42,6 +42,8 @@
 build/
 Build/
 build-*/
+# The nRF Connect VS Code extension names its build folders build_<name>.
+build_*/
 
 # CMake generated files
 CMakeFiles/

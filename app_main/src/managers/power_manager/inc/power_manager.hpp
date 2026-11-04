@@ -30,7 +30,11 @@ namespace power_manager
  * @brief Read and publish the battery, then start the manager thread. Call
  *        once the PMIC, the IMU and the LED are initialized, and before Bluetooth, so
  *        the first battery request is answered with a reading.
+ *
+ * @param pmic_ready Whether the PMIC started. Without it the PMIC is never
+ *        used: no battery readings and no low-battery power-off, while the
+ *        LED and idle sleep work as usual.
  */
-[[nodiscard]] fw::Result<> start();
+[[nodiscard]] fw::Result<> start( bool pmic_ready );
 
 } // namespace power_manager
