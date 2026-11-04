@@ -4,8 +4,9 @@
  *
  * Counts idle time in steps of activity_check_interval: each check() without
  * activity adds one. Commands (except battery polls, as Crimpdeq), configuration
- * requests, connections, measurements and motion are activity, and nothing counts while a
- * measurement runs. After the idle timeout (longer while a client is
+ * requests, connections, a measurement starting or stopping, pulls during a
+ * measurement and motion are activity: a measurement nobody pulls on idles
+ * like any connection. After the idle timeout (longer while a client is
  * connected, as Crimpdeq), the client is disconnected and, at the next check,
  * the device sleeps until it is moved, with the status LED off.
  *
@@ -47,7 +48,8 @@ public:
     void on_command( progressor::Opcode opcode );
     void on_configuration();
     void on_client_connection( bool connected );
-    void on_measurement( bool measuring );
+    void on_measurement();
+    void on_pull();
 
     /** @brief Every activity_check_interval: count idle time, and act on the timeout. Fails only if sleeping fails. */
     [[nodiscard]] fw::Result<> check();
@@ -67,7 +69,6 @@ private:
     IdleTimeouts timeouts_;
     std::chrono::seconds idle_{ 0 };
     bool connected_{ false };
-    bool measuring_{ false };
     bool disconnecting_{ false }; // idle: the client was asked to disconnect; sleep at the next check
 };
 

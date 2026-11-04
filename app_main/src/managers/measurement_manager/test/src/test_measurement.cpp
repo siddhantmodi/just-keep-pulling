@@ -296,6 +296,34 @@ TEST_F( MeasurementTest, StartWhileMeasuringStartsANewTimeline )
     EXPECT_EQ( samples[0].timestamp_us, 5714U );
 }
 
+TEST_F( MeasurementTest, ReportsAPullAtMostEveryTenSeconds )
+{
+    start_measuring( hal::SampleRate::sps20 );
+    ASSERT_TRUE( channels::pull.publish( { .kg = 0.0F }, K_NO_WAIT ) );
+    next_kg_ = -25.0F; // pulls read either sign; this test only needs a large load
+    auto const pulled = [] { return channels::pull.read( K_NO_WAIT ).value_or( channels::Pull{} ).kg; };
+
+    sample( 1 );
+    EXPECT_FLOAT_EQ( pulled(), -25.0F );
+
+    ASSERT_TRUE( channels::pull.publish( { .kg = 0.0F }, K_NO_WAIT ) );
+    sample( 199 ); // 9.95 s later
+    EXPECT_FLOAT_EQ( pulled(), 0.0F );
+    sample( 1 ); // 10 s
+    EXPECT_NE( pulled(), 0.0F );
+}
+
+TEST_F( MeasurementTest, ALightLoadIsNotAPull )
+{
+    start_measuring();
+    ASSERT_TRUE( channels::pull.publish( { .kg = 0.0F }, K_NO_WAIT ) );
+    ON_CALL( load_cell_, read( _ ) ).WillByDefault( Return( fw::Result<load_cell_svc::ForceSample>{ { .kg = 1.9F, .timestamp_us = 1 } } ) );
+
+    sample( 3 );
+
+    EXPECT_FLOAT_EQ( channels::pull.read( K_NO_WAIT ).value_or( channels::Pull{ .kg = 99.0F } ).kg, 0.0F );
+}
+
 TEST_F( MeasurementTest, TareSendsThePendingSamplesFirst )
 {
     start_measuring();

@@ -10,6 +10,7 @@
 #include <zephyr/logging/log.h>
 
 #include <algorithm>
+#include <cmath>
 #include <expected>
 #include <span>
 #include <system_error>
@@ -188,6 +189,7 @@ fw::Result<> Measurement::start_measurement()
     }
     rate_ = rate;
     origin_us_.reset();
+    last_pull_us_.reset();
     batch_size_ = 0;
     read_failures_ = 0;
     publish_state();
@@ -250,6 +252,7 @@ fw::Result<> Measurement::sample()
     if( batch_size_ >= batch_capacity_ ) {
         send_batch();
     }
+    report_pull( *sample );
     return {};
 }
 
@@ -273,6 +276,19 @@ void Measurement::send_batch()
         return;
     }
     LOG_ERR( "samples not sent: %d", fw::err::to_zephyr( sent.error() ) );
+}
+
+void Measurement::report_pull( const load_cell_svc::ForceSample &sample )
+{
+    constexpr auto interval_us = std::chrono::duration_cast<std::chrono::microseconds>( pull_report_interval ).count();
+    if( std::fabs( sample.kg ) < pull_threshold_kg ||
+        ( last_pull_us_ && sample.timestamp_us - *last_pull_us_ < static_cast<std::uint64_t>( interval_us ) ) ) {
+        return;
+    }
+    last_pull_us_ = sample.timestamp_us;
+    if( auto ret = channels::pull.publish( { .kg = sample.kg }, channels::lock_timeout ); !ret ) {
+        LOG_ERR( "pull publish failed: %d", fw::err::to_zephyr( ret.error() ) );
+    }
 }
 
 void Measurement::publish_state() const

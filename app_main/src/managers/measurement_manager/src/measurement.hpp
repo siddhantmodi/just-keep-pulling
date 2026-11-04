@@ -35,6 +35,10 @@ inline constexpr std::string_view app_version = CONFIG_APP_MEASUREMENT_MANAGER_A
 /** @brief Longest time a batch collects samples, so low rates still update the client often (Crimpdeq's). */
 inline constexpr std::chrono::milliseconds max_batch_duration{ 50 };
 
+/** @brief A load at least this far from zero, either way, is someone pulling: well above noise and drift after a tare. */
+inline constexpr float pull_threshold_kg = 2.0F;
+/** @brief A pull is reported at most this often: the power manager only checks for activity every 10 s. */
+inline constexpr std::chrono::seconds pull_report_interval{ 10 };
 /** @brief Consecutive failed reads after which the measurement stops, rather than retrying forever. */
 inline constexpr unsigned max_read_failures = 5;
 
@@ -138,8 +142,10 @@ private:
      */
     void send_batch();
     fw::Result<> reply( const progressor::Packet &packet );
-    /** @brief Publish channels::measurement_state, e.g. so the power manager doesn't sleep mid-measurement. */
+    /** @brief Publish channels::measurement_state: a measurement starting or stopping is activity for the power manager. */
     void publish_state() const;
+    /** @brief Publish channels::pull for a sample that shows one, at most every pull_report_interval. */
+    void report_pull( const load_cell_svc::ForceSample &sample );
     /** @brief Samples per batch: what one notification carries, and no more than max_batch_duration of them. */
     [[nodiscard]] std::size_t batch_capacity() const;
 
@@ -148,6 +154,7 @@ private:
     progressor::ProgressorId id_;
     std::optional<hal::SampleRate> rate_; // empty: not measuring
     std::optional<std::uint64_t> origin_us_;
+    std::optional<std::uint64_t> last_pull_us_;
     std::array<progressor::Sample, progressor::max_samples_per_packet> batch_{};
     std::size_t batch_size_{ 0 };
     std::size_t batch_capacity_{ 1 };

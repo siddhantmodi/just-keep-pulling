@@ -32,6 +32,11 @@ struct MeasurementState {
     bool measuring;
 };
 
+/** @brief Someone pulling on the load cell during a measurement, as a load of @p kg (either sign). */
+struct Pull {
+    float kg;
+};
+
 /** @brief A configuration request from the client (the JustKeepPulling service), already validated. */
 struct ConfigCommand {
     enum class Type : std::uint8_t {
@@ -63,8 +68,8 @@ struct CalibrationState {
 
 } // namespace channels
 
-ZBUS_CHAN_DECLARE( progressor_command_chan, client_connection_chan, measurement_state_chan, battery_chan, config_command_chan,
-                   calibration_state_chan );
+ZBUS_CHAN_DECLARE( progressor_command_chan, client_connection_chan, measurement_state_chan, battery_chan, config_command_chan, calibration_state_chan,
+                   pull_chan );
 
 namespace channels
 {
@@ -87,5 +92,7 @@ inline constexpr fw::ChannelRef<hal::BatteryStatus> battery{ battery_chan };
 inline constexpr fw::ChannelRef<ConfigCommand> config_command{ config_command_chan };
 /** @brief Published by the measurement manager at start and after each calibration request. */
 inline constexpr fw::ChannelRef<CalibrationState> calibration_state{ calibration_state_chan };
+/** @brief Published by the measurement manager while the load shows a pull, at most every few seconds: activity for the power manager. */
+inline constexpr fw::ChannelRef<Pull> pull{ pull_chan };
 
 } // namespace channels

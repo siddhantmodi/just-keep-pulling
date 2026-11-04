@@ -101,6 +101,8 @@ void on_message( const zbus_channel *chan )
         post( Event::change( Event::Type::client_connection, channels::client_connection.const_msg().connected ) );
     } else if( channels::measurement_state.is( chan ) ) {
         post( Event::change( Event::Type::measurement_state, channels::measurement_state.const_msg().measuring ) );
+    } else if( channels::pull.is( chan ) ) {
+        post( Event::of( Event::Type::pull ) );
     } else if( channels::battery.is( chan ) ) {
         post( Event::battery_reading( channels::battery.const_msg().millivolts ) );
     }
@@ -117,6 +119,7 @@ ZBUS_CHAN_ADD_OBS( progressor_command_chan, power_manager_listener, 0 );
 ZBUS_CHAN_ADD_OBS( config_command_chan, power_manager_listener, 0 );
 ZBUS_CHAN_ADD_OBS( client_connection_chan, power_manager_listener, 0 );
 ZBUS_CHAN_ADD_OBS( measurement_state_chan, power_manager_listener, 0 );
+ZBUS_CHAN_ADD_OBS( pull_chan, power_manager_listener, 0 );
 ZBUS_CHAN_ADD_OBS( battery_chan, power_manager_listener, 0 );
 
 namespace
@@ -163,7 +166,10 @@ fw::Result<> handle( const Event &event )
         activity().on_client_connection( event.active );
         return indicator().on_client_connection( event.active );
     case Event::Type::measurement_state:
-        activity().on_measurement( event.active );
+        activity().on_measurement();
+        return {};
+    case Event::Type::pull:
+        activity().on_pull();
         return {};
     case Event::Type::battery:
         return indicator().on_battery( event.millivolts );

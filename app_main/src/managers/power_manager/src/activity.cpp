@@ -45,15 +45,19 @@ void Activity::on_client_connection( bool connected )
     reset();
 }
 
-void Activity::on_measurement( bool measuring )
+void Activity::on_measurement()
 {
-    measuring_ = measuring;
+    reset();
+}
+
+void Activity::on_pull()
+{
     reset();
 }
 
 fw::Result<> Activity::check()
 {
-    if( motion_.moved() || measuring_ ) {
+    if( motion_.moved() ) {
         reset();
         return {};
     }

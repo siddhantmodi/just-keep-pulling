@@ -27,6 +27,7 @@ struct Event {
         configuration,     // the client wrote a configuration request (calibration, sample rate)
         client_connection, // a client connected or disconnected (active)
         measurement_state, // a measurement started or stopped (active)
+        pull,              // someone pulled on the load cell while measuring
         battery,           // a battery reading was published (millivolts)
         blink_step,        // blink timer
     };

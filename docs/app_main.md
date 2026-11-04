@@ -51,7 +51,8 @@ classDiagram
             +on_command(Opcode)
             +on_configuration()
             +on_client_connection(bool)
-            +on_measurement(bool)
+            +on_measurement()
+            +on_pull()
             +check() Result
             +idle() seconds
         }
@@ -201,6 +202,10 @@ classDiagram
         class measurement_state {
             <<zbus>>
             bool measuring
+        }
+        class pull {
+            <<zbus>>
+            float kg
         }
         class config_command {
             <<zbus>>
@@ -384,6 +389,8 @@ classDiagram
     client_connection ..> Activity : listener, queue
     measurement_state ..> Activity : listener, queue
     Measurement ..> measurement_state : publishes
+    Measurement ..> pull : publishes, at most every 10 s
+    pull ..> Activity : listener, queue
     Motion --> IMotionSensor : sensor_
     Motion --> IPowerOff : system_off_
     SensorMotion ..> lsm6dsl_driver
@@ -415,7 +422,7 @@ The measurement manager's thread takes `Event`s off its queue (fed by a zbus lis
 
 The power manager's thread reads the battery every 30 s (its timer posts an `Event`) and publishes it on `channels::battery`, which the measurement manager answers 0x6F from. A reading at or below 3.3 V with no charging or USB power is confirmed 1 s later; then the client gets the 0x04 low-power warning and, 0.5 s later, the PMIC enters ship mode. It is the only caller of `IPmic`.
 
-The same thread tracks inactivity (`Activity`): a 10 s timer checks for motion and counts idle time, and commands (except battery polls), configuration requests, connections and measurements reset it; nothing counts while measuring. After 4 minutes idle (30 with a client connected), the client is disconnected and, 10 s later unless something happened meanwhile, the SoC enters System OFF, woken by the IMU's motion interrupt.
+The same thread tracks inactivity (`Activity`): a 10 s timer checks for motion and counts idle time, and commands (except battery polls), configuration requests, connections, a measurement starting or stopping, and pulls reset it. The measurement manager publishes a pull (`channels::pull`) when a sample is 2 kg or more from zero, at most every 10 s, so a measurement nobody pulls on (e.g. the app left open) idles like any connection. After 4 minutes idle (30 with a client connected), the client is disconnected and, 10 s later unless something happened meanwhile, the SoC enters System OFF, woken by the IMU's motion interrupt.
 
 It also drives the status LED (`Indicator`), as Crimpdeq: blue without a client, green with one, red blinking (250 ms on, 750 ms off, on a 250 ms timer) at or below 3.5 V, and off before sleeping, since GPIOs keep their state in System OFF.
 

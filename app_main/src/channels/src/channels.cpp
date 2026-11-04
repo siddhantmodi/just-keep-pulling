@@ -20,3 +20,5 @@ ZBUS_CHAN_DEFINE( config_command_chan, channels::ConfigCommand, nullptr, nullptr
                   ZBUS_MSG_INIT( channels::ConfigCommand::Type::reset_calibration, 0.0F, 0 ) );
 ZBUS_CHAN_DEFINE( calibration_state_chan, channels::CalibrationState, nullptr, nullptr, ZBUS_OBSERVERS_EMPTY,
                   ZBUS_MSG_INIT( channels::CalibrationStatus::ok, 0, 0.0F ) );
+// An event, never read back, so the initial value is only a placeholder.
+ZBUS_CHAN_DEFINE( pull_chan, channels::Pull, nullptr, nullptr, ZBUS_OBSERVERS_EMPTY, ZBUS_MSG_INIT( 0.0F ) );

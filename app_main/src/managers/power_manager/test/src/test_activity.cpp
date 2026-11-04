@@ -106,15 +106,32 @@ TEST_F( ActivityTest, BatteryPollsDoNotKeepItAwake )
     EXPECT_EQ( activity_.idle(), 200s );
 }
 
-TEST_F( ActivityTest, NothingCountsWhileMeasuring )
+TEST_F( ActivityTest, AMeasurementStartingOrStoppingKeepsItAwake )
 {
-    activity_.on_measurement( true );
-    idle_for( 3600s ); // no sleep: StrictMock fails on any call
+    idle_for( 200s );
+    activity_.on_measurement();
     EXPECT_EQ( activity_.idle(), 0s );
+}
 
-    activity_.on_measurement( false );
+TEST_F( ActivityTest, PullsKeepItAwake )
+{
+    activity_.on_client_connection( true );
+    activity_.on_measurement();
+    for( int minute = 0; minute < 60; ++minute ) {
+        idle_for( 60s );
+        activity_.on_pull();
+    }
+    EXPECT_EQ( activity_.idle(), 0s ); // an hour of pulls: no disconnect (StrictMock fails on any call)
+}
+
+TEST_F( ActivityTest, AMeasurementNobodyPullsOnIdlesLikeAConnection )
+{
+    activity_.on_client_connection( true );
+    activity_.on_measurement();
+    idle_for( 1790s );
+    EXPECT_CALL( client_, disconnect() ).WillOnce( Return( fw::Result<>{} ) );
+
     idle_for( 10s );
-    EXPECT_EQ( activity_.idle(), 10s );
 }
 
 TEST_F( ActivityTest, WaitsLongerWithAClient )
