@@ -8,6 +8,7 @@ import re
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 
+import pytest
 import pytest_asyncio
 from bumble.device import Peer
 from gatt_helpers import CLIENT_MTU
@@ -20,6 +21,12 @@ class Device:
 
     name: str
     device_id: bytes
+
+
+@pytest.fixture
+def dut_args() -> list[str]:
+    """Each test boots on erased flash, as a device's first boot, and leaves no flash file behind."""
+    return ["--flash_erase", "--flash_rm"]
 
 
 @pytest_asyncio.fixture

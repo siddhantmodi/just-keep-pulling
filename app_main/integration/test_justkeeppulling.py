@@ -151,14 +151,10 @@ async def test_sets_and_saves_the_sample_rate(peer, ble_dut):
         return struct.unpack("<H", await sample_rate.read_value())[0]
 
     assert await read() == DEFAULT_SAMPLE_RATE
-    try:
-        await write(peer, SAMPLE_RATE_UUID, struct.pack("<H", 1000))
-        await wait_for_log(ble_dut, r"sample rate set to 1000 SPS")
-        # Applied by the measurement manager, so shortly after the write.
-        assert await eventually(read, 1000) == 1000
-    finally:
-        # Saved in settings: leave the default for the other tests.
-        await write(peer, SAMPLE_RATE_UUID, struct.pack("<H", DEFAULT_SAMPLE_RATE))
+    await write(peer, SAMPLE_RATE_UUID, struct.pack("<H", 1000))
+    await wait_for_log(ble_dut, r"sample rate set to 1000 SPS")
+    # Applied by the measurement manager, so shortly after the write.
+    assert await eventually(read, 1000) == 1000
 
 
 @pytest.mark.asyncio
