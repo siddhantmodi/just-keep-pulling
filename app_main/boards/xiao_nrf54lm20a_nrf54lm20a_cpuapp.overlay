@@ -55,9 +55,14 @@
 	/* 1000 mAh LiPo (JLJLUP): 500 mA (0.5C, a standard LiPo charge rate) to 4.2 V, within the 500 mA USB budget. */
 	term-microvolt = <4200000>;
 	current-microamp = <500000>;
-	/* Seeed's 10 kOhm NTC (beta 3380). To confirm on the schematic: with no
-	 * thermistor fitted, the charger would see an open NTC and not charge. */
-	thermistor-ohms = <10000>;
+	/*
+	 * No battery thermistor assumed: the charger ignores its NTC input, so it
+	 * charges without temperature limits (no cut-off below 0 C or above 45 C).
+	 * Configured for one with none fitted, it would read an open NTC as a cold
+	 * battery and never charge. With a 10 kOhm NTC (beta 3380, Seeed's board
+	 * files' values), set those here. The beta is unused without one.
+	 */
+	thermistor-ohms = <0>;
 	thermistor-beta = <3380>;
 };
 
