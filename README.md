@@ -60,6 +60,7 @@ app_main/             The dynamometer firmware (XIAO nRF54LM20A; native_sim for 
   src/services/       One subsystem or peripheral each (identity_svc, load_cell_svc, ble_svc and its GATT services, pmic_svc, motion_svc, led_svc)
   src/modules/        Pure logic, no Zephyr (calibration, progressor)
   src/debug_shell/    "jkp" shell commands, debug builds only
+  src/emulated_load/  Emulated pulls on the user button, emulated-ADC builds only
     <component>/      Each component:
       inc/            Public API
       src/            Implementation
@@ -97,6 +98,10 @@ west flash -d build/app_main
 
 # Debug build: adds logging (with the reset cause at boot) and the shell on the console UART, with "jkp id", "jkp rate" and "jkp battery" commands
 west build -b xiao_nrf54lm20a/nrf54lm20a/cpuapp -d build/app_main-debug just-keep-pulling/app_main -- -DEXTRA_CONF_FILE=debug.conf
+
+# Debug build without the ADC fitted: the ADS1220 emulator stands in, and holding the user button pulls 25 kg
+west build -b xiao_nrf54lm20a/nrf54lm20a/cpuapp -d build/app_main-emul just-keep-pulling/app_main -- \
+  -DEXTRA_CONF_FILE="debug.conf;emulated_adc.conf" -DEXTRA_DTC_OVERLAY_FILE=emulated_adc.overlay
 ```
 
 It also builds and runs on `native_sim/native/64`, with an emulated ADS1220.

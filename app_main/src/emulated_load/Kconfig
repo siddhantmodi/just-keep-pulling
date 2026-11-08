@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: Apache-2.0
+
+config APP_EMULATED_LOAD
+	bool "Emulated pulls on the user button"
+	depends on JKP_ADS1220_EMUL && $(dt_alias_enabled,sw0)
+	help
+	  With the ADS1220 emulator in place of the ADC (emulated_adc.conf),
+	  holding the user button pulls APP_EMULATED_LOAD_PEAK_KG.
+
+config APP_EMULATED_LOAD_PEAK_KG
+	int "Emulated pull (kg)"
+	default 25
+	depends on APP_EMULATED_LOAD

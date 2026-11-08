@@ -33,3 +33,4 @@ add_subdirectory_ifdef(CONFIG_APP_POWER_MANAGER src/managers/power_manager)
 
 # Debug builds only (debug.conf)
 add_subdirectory_ifdef(CONFIG_APP_DEBUG_SHELL src/debug_shell)
+add_subdirectory_ifdef(CONFIG_APP_EMULATED_LOAD src/emulated_load)

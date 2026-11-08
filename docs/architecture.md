@@ -143,6 +143,7 @@ Tests construct a fresh instance per test with mocks: no singleton reset, no lin
 | `led_svc` | `status-led-red`, `status-led-green`, `status-led-blue` (GPIO) |
 | `power_manager` | `pmic_svc::pmic()`, `motion_svc::motion()`, `led_svc::led()`, `ble_svc::client()`, channel `battery` (out, and in for the LED), channels `progressor_command`, `config_command`, `client_connection`, `measurement_state` and `pull` (in) |
 | `debug_shell` | `identity_svc::identity()`, `load_cell_svc::load_cell()` (the thread-safe sample rate only), channel `battery` (read) |
+| `emulated_load` | `load-cell-adc` (the ADS1220 emulator), `sw0` (the user button) |
 
 ## Changes to Zephyr and other dependencies
 
@@ -153,6 +154,8 @@ Carried now: the LSM6DSL motion (wake-up) trigger, used to sleep when idle and w
 ## Build variants
 
 An app's default build is its **release** build. `debug.conf` (added with `-DEXTRA_CONF_FILE=debug.conf`) makes the **debug** build: it enables Zephyr's shell with the app's debug commands (`app_main/src/debug_shell/`, e.g. overwriting the device ID) and asserts, and logs the reset cause at boot. Debug-only code depends on `CONFIG_SHELL`, so it cannot reach a release build; CI builds both and fails if a release build enables the shell. clang-tidy analyzes the debug build, which contains everything the release build does.
+
+For trying the phone apps on a board without the ADC fitted, `emulated_adc.conf` and `emulated_adc.overlay` (on top of `debug.conf`) put the ADS1220 emulator in place of the ADC, and holding the user button pulls (`app_main/src/emulated_load/`).
 
 Shell commands run in the shell thread, so they only call services' thread-safe operations (documented on each), not the single-threaded ones a manager owns.
 

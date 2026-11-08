@@ -65,6 +65,11 @@ classDiagram
         jkp battery
     }
 
+    class emulated_load {
+        <<emulated_adc builds only>>
+        user button held: pull to 25 kg
+    }
+
     namespace identity_svc {
         class IIdentity {
             <<interface>>
@@ -311,7 +316,7 @@ classDiagram
             ads1220_stop(dev) int
         }
         class ads1220_emul {
-            <<native_sim only>>
+            <<native_sim, or emulated_adc builds>>
             emulates the chip on the SPI emulator bus
             ads1220_emul_set_raw(raw)
             ads1220_emul_set_source(fn)
@@ -416,6 +421,7 @@ classDiagram
     battery ..> BatteryService : listener, level
     Ads1220 ..> ads1220_driver
     ads1220_emul ..> ads1220_driver : answers its SPI
+    emulated_load ..> ads1220_emul : set_source
 ```
 
 The measurement manager's thread takes `Event`s off its queue (fed by a zbus listener on its three channels) and, while measuring, calls `sample()` between them: each `ForceSample` becomes a `progressor::Sample` with its time since the measurement started, and batches of up to 50 ms (at most what one notification carries) go out through `ble_svc::client()`. It also applies configuration requests from the JustKeepPulling service (`channels::config_command`: a calibration point, a calibration reset, the sample rate) and publishes how calibration went on `channels::calibration_state`, which the service reads and notifies. It is the only caller of `ILoadCell`'s single-threaded operations; the JustKeepPulling service and the debug shell only read the thread-safe sample rate.
