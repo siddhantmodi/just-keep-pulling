@@ -11,6 +11,7 @@ classDiagram
     class main {
         <<entry point>>
         main()
+        confirms a new image once BLE is up
     }
 
     namespace measurement_manager {

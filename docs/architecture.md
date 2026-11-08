@@ -156,6 +156,8 @@ An app's default build is its **release** build. `debug.conf` (added with `-DEXT
 
 For trying the phone apps on a board without the ADC fitted, `emulated_adc.conf` and `emulated_adc.overlay` (on top of `debug.conf`) put the ADS1220 emulator in place of the ADC, and holding the user button pulls, or the shell's `emul raw <code>` holds a fixed ADC code (`app_main/src/emulated_load/`). For battery tests, `battery_log.conf` (on top of `debug.conf`) logs every battery reading and keeps the device awake; `scripts/battery_log.py` records the readings as CSV.
 
+On the XIAO, sysbuild adds MCUboot (`app_main/Kconfig.sysbuild`, its options in `app_main/sysbuild/mcuboot.conf`) to every variant: two slots, swap using move, Ed25519 signatures, updates over Bluetooth (SMP). native_sim builds have no bootloader.
+
 Shell commands run in the shell thread, so they only call services' thread-safe operations (documented on each), not the single-threaded ones a manager owns.
 
 ## Why C++ and not C

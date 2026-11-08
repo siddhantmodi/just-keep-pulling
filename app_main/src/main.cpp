@@ -16,6 +16,9 @@
 
 #include <zephyr/app_version.h>
 #include <zephyr/logging/log.h>
+#if defined( CONFIG_BOOTLOADER_MCUBOOT )
+#include <zephyr/dfu/mcuboot.h>
+#endif
 #if defined( CONFIG_HWINFO )
 #include <zephyr/drivers/hwinfo.h>
 #endif
@@ -117,5 +120,17 @@ int main()
         LOG_ERR( "BLE service init failed: %d", fw::err::to_zephyr( ret.error() ) );
         return 0;
     }
+
+#if defined( CONFIG_BOOTLOADER_MCUBOOT )
+    // A new image runs on trial until here: if it fails before, MCUboot goes back to the previous one at the next reset.
+    if( !boot_is_img_confirmed() ) {
+        if( auto ret = fw::err::check( boot_write_img_confirmed() ); ret ) {
+            LOG_INF( "new firmware confirmed" );
+        } else {
+            LOG_ERR( "new firmware not confirmed, the previous one returns at the next reset: %d", fw::err::to_zephyr( ret.error() ) );
+        }
+    }
+#endif
+
     return 0;
 }

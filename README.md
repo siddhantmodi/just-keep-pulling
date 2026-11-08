@@ -91,6 +91,10 @@ The west workspace topdir is the **parent** of this repo; dependencies live in `
 
 From the workspace topdir (`/home/user/workspace` in the devcontainer):
 
+On the XIAO, every build includes MCUboot, and `west flash` writes it and the signed app. Local builds are signed with MCUboot's public development key; CI signs pushes to `main` with ours (the `MCUBOOT_SIGNING_KEY` secret). A board accepts updates signed with the key its MCUboot was built with, so switching between local and CI images means flashing over the debug port.
+
+Updates over Bluetooth use the standard SMP service, e.g. from nRF Connect Device Manager with `dfu_application.zip` or `app_main/zephyr/zephyr.signed.bin`. A new image runs on trial: `main()` confirms it once Bluetooth is up, and if it fails before that, MCUboot goes back to the previous image at the next reset.
+
 ```sh
 # Release build (no logging, no shell)
 west build -b xiao_nrf54lm20a/nrf54lm20a/cpuapp -d build/app_main just-keep-pulling/app_main
