@@ -143,9 +143,13 @@ fw::Result<> Measurement::add_calibration_point( float kg )
 
     auto points = load_cell_.add_calibration_point( kg );
     if( points ) {
+        auto const factor_ug = std::lround( load_cell_.calibration_factor() * 1e6F );
+        LOG_INF( "calibration point %u at %ld g; factor %ld.%03ld mg/code", static_cast<unsigned>( *points ), std::lround( kg * 1000.0F ),
+                 factor_ug / 1000, factor_ug % 1000 );
         publish_calibration( channels::CalibrationStatus::ok );
         return {};
     }
+    LOG_WRN( "calibration point not added: %d", fw::err::to_zephyr( points.error() ) );
 
     channels::CalibrationStatus status = channels::CalibrationStatus::failed;
     switch( points.error() ) {
@@ -179,6 +183,7 @@ fw::Result<> Measurement::start_measurement()
         // A new measurement on a new timeline, as Crimpdeq: the old one's pending samples are dropped.
         batch_size_ = 0;
         origin_us_.reset();
+        stats_ = {};
         return {};
     }
 
@@ -192,6 +197,7 @@ fw::Result<> Measurement::start_measurement()
     last_pull_us_.reset();
     batch_size_ = 0;
     read_failures_ = 0;
+    stats_ = {};
     publish_state();
     LOG_INF( "measuring at %u SPS, %u samples per notification", hal::samples_per_second( rate ), static_cast<unsigned>( batch_capacity() ) );
 
@@ -214,8 +220,7 @@ fw::Result<> Measurement::stop_measurement( bool send_pending )
     publish_state();
 
     auto stopped = load_cell_.stop();
-    LOG_INF( "measurement stopped: %u samples lost, %u batches dropped so far", static_cast<unsigned>( load_cell_.lost_samples() ),
-             static_cast<unsigned>( dropped_batches_ ) );
+    log_stats();
     if( auto ret = client_.set_streaming( false ); !ret && !no_listener( ret.error() ) ) {
         LOG_WRN( "idle connection parameters not requested: %d", fw::err::to_zephyr( ret.error() ) );
     }
@@ -239,6 +244,7 @@ fw::Result<> Measurement::sample()
         return std::unexpected( sample.error() );
     }
     read_failures_ = 0;
+    stats_.add( *sample );
 
     if( !origin_us_ ) {
         origin_us_ = sample->timestamp_us - period_us( *rate_ );
@@ -289,6 +295,22 @@ void Measurement::report_pull( const load_cell_svc::ForceSample &sample )
     if( auto ret = channels::pull.publish( { .kg = sample.kg }, channels::lock_timeout ); !ret ) {
         LOG_ERR( "pull publish failed: %d", fw::err::to_zephyr( ret.error() ) );
     }
+}
+
+void Measurement::log_stats() const
+{
+    // One decimal in fixed point: the logs have no float formatting.
+    auto const tenths = []( double value ) { return std::lround( value * 10.0 ); };
+    auto const sps = tenths( stats_.samples_per_second() );
+    LOG_INF( "measurement stopped: %u samples at %ld.%ld SPS, longest gap %u us, %u lost; %u batches dropped so far",
+             static_cast<unsigned>( stats_.count() ), sps / 10, sps % 10, static_cast<unsigned>( stats_.max_gap_us() ),
+             static_cast<unsigned>( load_cell_.lost_samples() ), static_cast<unsigned>( dropped_batches_ ) );
+    if( stats_.count() == 0 ) {
+        return;
+    }
+    auto const sd = tenths( stats_.sd_raw() );
+    LOG_INF( "raw codes: mean %ld, sd %ld.%ld, min %d, max %d; mean %ld g", std::lround( stats_.mean_raw() ), sd / 10, sd % 10,
+             static_cast<int>( stats_.min_raw() ), static_cast<int>( stats_.max_raw() ), std::lround( stats_.mean_kg() * 1000.0 ) );
 }
 
 void Measurement::publish_state() const

@@ -25,4 +25,5 @@ target_sources(app PRIVATE
     ../../../modules/progressor/src/progressor.cpp
     ../src/measurement.cpp
     src/test_measurement.cpp
+    src/test_sample_stats.cpp
 )

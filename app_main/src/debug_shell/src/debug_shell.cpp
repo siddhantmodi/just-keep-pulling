@@ -1,12 +1,14 @@
 /**
  * @file debug_shell.cpp
- * @brief Debug-build shell commands: jkp id [set <hex>], jkp rate [set <SPS>], jkp battery.
+ * @brief Debug-build shell commands: jkp id [set <hex>], jkp rate [set <SPS>], jkp battery,
+ *        jkp tare, jkp measure <s>, jkp calibrate <kg>|reset.
  *
  * Built only when debug.conf enables the shell. Commands run in the shell
  * thread, so they only use the services' thread-safe calls: changing the ID
  * (picked up on the next boot) and the configured sample rate (picked up on
  * the next measurement). The battery comes from the power manager's latest
- * reading on zbus.
+ * reading on zbus. Tare, measure and calibrate publish the commands a client
+ * would, for the measurement manager; their results are in its log.
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -14,11 +16,14 @@
 #include "channels.hpp"
 #include "identity_svc.hpp"
 #include "load_cell_svc.hpp"
+#include "progressor.hpp"
 
+#include <zephyr/kernel.h>
 #include <zephyr/shell/shell.h>
 
 #include <cerrno>
 #include <charconv>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
@@ -118,6 +123,61 @@ int cmd_battery( const shell *sh, size_t /*argc*/, char ** /*argv*/ )
     return 0;
 }
 
+int publish( const shell *sh, progressor::Opcode opcode )
+{
+    if( auto ret = channels::progressor_command.publish( { .opcode = opcode }, channels::lock_timeout ); !ret ) {
+        shell_error( sh, "not sent: %d", fw::err::to_zephyr( ret.error() ) );
+        return fw::err::to_zephyr( ret.error() );
+    }
+    return 0;
+}
+
+int publish( const shell *sh, const channels::ConfigCommand &command )
+{
+    if( auto ret = channels::config_command.publish( command, channels::lock_timeout ); !ret ) {
+        shell_error( sh, "not sent: %d", fw::err::to_zephyr( ret.error() ) );
+        return fw::err::to_zephyr( ret.error() );
+    }
+    return 0;
+}
+
+int cmd_tare( const shell *sh, size_t /*argc*/, char ** /*argv*/ )
+{
+    return publish( sh, progressor::Opcode::tare );
+}
+
+constexpr unsigned max_measure_seconds = 3600;
+
+int cmd_measure( const shell *sh, size_t /*argc*/, char **argv )
+{
+    unsigned seconds = 0;
+    const char *const end = argv[1] + std::strlen( argv[1] );
+    auto [parsed_end, parse_error] = std::from_chars( argv[1], end, seconds );
+    if( parse_error != std::errc{} || parsed_end != end || seconds == 0 || seconds > max_measure_seconds ) {
+        shell_error( sh, "expected 1 to %u seconds", max_measure_seconds );
+        return -EINVAL;
+    }
+    if( auto ret = publish( sh, progressor::Opcode::start_measurement ); ret != 0 ) {
+        return ret;
+    }
+    k_sleep( K_SECONDS( seconds ) );
+    return publish( sh, progressor::Opcode::stop_measurement );
+}
+
+int cmd_calibrate( const shell *sh, size_t /*argc*/, char **argv )
+{
+    if( std::strcmp( argv[1], "reset" ) == 0 ) {
+        return publish( sh, { .type = channels::ConfigCommand::Type::reset_calibration, .calibration_kg = 0.0F, .samples_per_second = 0 } );
+    }
+    char *end = nullptr;
+    float const kg = std::strtof( argv[1], &end );
+    if( end == argv[1] || *end != '\0' || !std::isfinite( kg ) || kg < 0.0F ) {
+        shell_error( sh, "expected a load in kg (0 or more), or reset" );
+        return -EINVAL;
+    }
+    return publish( sh, { .type = channels::ConfigCommand::Type::add_calibration_point, .calibration_kg = kg, .samples_per_second = 0 } );
+}
+
 } // namespace
 
 // The Zephyr shell macros declare C arrays and compare the subcommand and handler with NULL,
@@ -130,6 +190,11 @@ SHELL_STATIC_SUBCMD_SET_CREATE( jkp_rate_cmds, SHELL_CMD_ARG( set, NULL, "Set th
 SHELL_STATIC_SUBCMD_SET_CREATE( jkp_cmds, SHELL_CMD( id, &jkp_id_cmds, "Show the device ID; jkp id set <12 hex digits> sets it", cmd_id ),
                                 SHELL_CMD( rate, &jkp_rate_cmds, "Show the sample rate; jkp rate set <SPS> sets it", cmd_rate ),
                                 SHELL_CMD( battery, NULL, "Show the latest battery reading and state of charge (every 5 s)", cmd_battery ),
+                                SHELL_CMD( tare, NULL, "Zero the scale, as the app's tare", cmd_tare ),
+                                SHELL_CMD_ARG( measure, NULL, "Measure for <seconds> without a client; the statistics are logged at the end",
+                                               cmd_measure, 2, 0 ),
+                                SHELL_CMD_ARG( calibrate, NULL, "Add a calibration point under <kg>, or reset to the default factor", cmd_calibrate,
+                                               2, 0 ),
                                 SHELL_SUBCMD_SET_END );
 SHELL_CMD_REGISTER( jkp, &jkp_cmds, "Dynamometer debug commands", NULL );
 // NOLINTEND(modernize-avoid-c-arrays,modernize-use-nullptr,performance-no-int-to-ptr)

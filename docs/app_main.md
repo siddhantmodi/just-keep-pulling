@@ -28,6 +28,12 @@ classDiagram
             client_connection: ClientConnection
             config_command: ConfigCommand
         }
+        class SampleStats {
+            <<logged when a measurement stops>>
+            +add(ForceSample)
+            rate, longest gap
+            raw mean, sd, min, max; mean kg
+        }
     }
 
     namespace power_manager {
@@ -73,6 +79,8 @@ classDiagram
         jkp id [set hex]
         jkp rate [set SPS]
         jkp battery
+        jkp tare, jkp measure s
+        jkp calibrate kg|reset
     }
 
     class emulated_load {
@@ -125,6 +133,7 @@ classDiagram
         class ForceSample {
             +float kg
             +uint64 timestamp_us
+            +int32 raw
         }
     }
 
@@ -394,6 +403,8 @@ classDiagram
     debug_shell ..> IIdentity
     debug_shell ..> ILoadCell : rate only
     debug_shell ..> battery : reads
+    debug_shell ..> progressor_command : publishes tare, start, stop
+    debug_shell ..> config_command : publishes calibration
 
     Identity ..> fw_settings : "identity/id"
     Identity ..> DeviceId
@@ -407,6 +418,7 @@ classDiagram
     Measurement --> IClient : client_
     Measurement ..> progressor : encode responses and samples
     Measurement ..> Event
+    Measurement --> SampleStats : stats_
     Measurement ..> battery : reads for 0x6F
     Power --> IPmic : pmic_
     Power --> IClient : low-power warning
@@ -455,7 +467,7 @@ classDiagram
     emulated_load ..> ads1220_emul : set_source
 ```
 
-The measurement manager's thread takes `Event`s off its queue (fed by a zbus listener on its three channels) and, while measuring, calls `sample()` between them: each `ForceSample` becomes a `progressor::Sample` with its time since the measurement started, and batches of up to 50 ms (at most what one notification carries) go out through `ble_svc::client()`. It also applies configuration requests from the JustKeepPulling service (`channels::config_command`: a calibration point, a calibration reset, the sample rate) and publishes how calibration went on `channels::calibration_state`, which the service reads and notifies. It is the only caller of `ILoadCell`'s single-threaded operations; the JustKeepPulling service and the debug shell only read the thread-safe sample rate.
+The measurement manager's thread takes `Event`s off its queue (fed by a zbus listener on its three channels) and, while measuring, calls `sample()` between them: each `ForceSample` becomes a `progressor::Sample` with its time since the measurement started, and batches of up to 50 ms (at most what one notification carries) go out through `ble_svc::client()`. It also applies configuration requests from the JustKeepPulling service (`channels::config_command`: a calibration point, a calibration reset, the sample rate) and publishes how calibration went on `channels::calibration_state`, which the service reads and notifies. It is the only caller of `ILoadCell`'s single-threaded operations; the JustKeepPulling service and the debug shell only read the thread-safe sample rate. For bring-up, the debug shell publishes the same tare, start, stop and calibration commands a client would, and each measurement's `SampleStats` (the rate it really ran at, gaps, lost samples, the spread of the raw codes) are logged when it stops.
 
 The power manager's thread reads the battery every 5 s (its timer posts an `Event`), feeds the reading to the fuel gauge (`Gauge`), and publishes both on `channels::battery`: the measurement manager answers 0x6F with the voltage, and the Battery service and the LED use the state of charge. On the XIAO the gauge is Nordic's nRF Fuel Gauge with the model of the LiPol LP602760 (a 1000 mAh cell like the one fitted), given the nPM1300's voltage, current (200 mA discharge limit, for 0.22 mA steps), charger state and die temperature (no battery thermistor); on native_sim, `CurveGauge` maps the voltage to a typical LiPo curve. The gauge's state is saved to settings every 10 minutes and before System OFF or ship mode, and resumed at boot, so a reset or the power switch costs at most 10 minutes of tracking. A reading at or below 3.3 V with no charging or USB power is confirmed 1 s later; then the client gets the 0x04 low-power warning and, 0.5 s later, the PMIC enters ship mode. It is the only caller of `IPmic`.
 

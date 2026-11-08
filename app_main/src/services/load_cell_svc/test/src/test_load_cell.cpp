@@ -100,7 +100,7 @@ TEST_F( LoadCellTest, InitFailsWhenAdcNotReady )
     EXPECT_EQ( load_cell_.init().error(), std::errc::no_such_device );
 }
 
-TEST_F( LoadCellTest, ReadAppliesTareAndFactorAndKeepsTimestamp )
+TEST_F( LoadCellTest, ReadAppliesTareAndFactorAndKeepsTimestampAndCode )
 {
     ASSERT_TRUE( load_cell_.init() );
     ASSERT_TRUE( load_cell_.start( SampleRate::sps175 ) );
@@ -113,6 +113,7 @@ TEST_F( LoadCellTest, ReadAppliesTareAndFactorAndKeepsTimestamp )
     ASSERT_TRUE( sample );
     EXPECT_NEAR( sample->kg, 20.0F, 0.001F );
     EXPECT_EQ( sample->timestamp_us, timestamp_us_ );
+    EXPECT_EQ( sample->raw, raw_ );
 }
 
 TEST_F( LoadCellTest, TareWhileStoppedSamplesBrieflyAtTheDefaultRate )

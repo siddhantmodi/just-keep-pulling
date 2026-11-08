@@ -15,6 +15,7 @@
 #include "channels.hpp"
 #include "load_cell_svc.hpp"
 #include "progressor.hpp"
+#include "sample_stats.hpp"
 
 #include <array>
 #include <chrono>
@@ -142,6 +143,8 @@ private:
      */
     void send_batch();
     fw::Result<> reply( const progressor::Packet &packet );
+    /** @brief Log the measurement's SampleStats, its lost samples and the batches dropped. */
+    void log_stats() const;
     /** @brief Publish channels::measurement_state: a measurement starting or stopping is activity for the power manager. */
     void publish_state() const;
     /** @brief Publish channels::pull for a sample that shows one, at most every pull_report_interval. */
@@ -160,6 +163,7 @@ private:
     std::size_t batch_capacity_{ 1 };
     unsigned read_failures_{ 0 };
     std::uint32_t dropped_batches_{ 0 };
+    SampleStats stats_{}; // logged when the measurement stops
 };
 
 } // namespace measurement_manager

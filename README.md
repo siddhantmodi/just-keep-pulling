@@ -96,7 +96,8 @@ From the workspace topdir (`/home/user/workspace` in the devcontainer):
 west build -b xiao_nrf54lm20a/nrf54lm20a/cpuapp -d build/app_main just-keep-pulling/app_main
 west flash -d build/app_main
 
-# Debug build: adds logging (with the reset cause at boot) and the shell on the console UART, with "jkp id", "jkp rate" and "jkp battery" commands
+# Debug build: adds logging (with the reset cause at boot) and the shell on the console UART, with "jkp" commands:
+# id, rate, battery, and tare, measure <s> and calibrate <kg>|reset, which act as the app would and log the results
 west build -b xiao_nrf54lm20a/nrf54lm20a/cpuapp -d build/app_main-debug just-keep-pulling/app_main -- -DEXTRA_CONF_FILE=debug.conf
 
 # Debug build without the ADC fitted: the ADS1220 emulator stands in; holding the user button pulls 25 kg,

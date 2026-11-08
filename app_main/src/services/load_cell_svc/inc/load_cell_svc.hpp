@@ -27,6 +27,8 @@ struct ForceSample {
     float kg;
     /** Microseconds since boot when the ADC completed the conversion. */
     std::uint64_t timestamp_us;
+    /** The ADC code it came from, before tare and calibration. */
+    std::int32_t raw;
 };
 
 class ILoadCell

@@ -84,7 +84,7 @@ fw::Result<ForceSample> LoadCell::read( std::chrono::microseconds timeout )
     if( !sample ) {
         return std::unexpected( sample.error() );
     }
-    return ForceSample{ .kg = calibration::to_kg( sample->raw, tare_, factor_ ), .timestamp_us = sample->timestamp_us };
+    return ForceSample{ .kg = calibration::to_kg( sample->raw, tare_, factor_ ), .timestamp_us = sample->timestamp_us, .raw = sample->raw };
 }
 
 fw::Result<> LoadCell::stop()
