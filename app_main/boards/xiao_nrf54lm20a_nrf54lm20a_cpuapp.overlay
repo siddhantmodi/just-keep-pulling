@@ -86,6 +86,14 @@
 			regulator-boot-on;
 		};
 	};
+
+	/* As Seeed's board. */
+	pmic_leds: leds {
+		compatible = "nordic,npm1300-led";
+		nordic,led0-mode = "error";
+		nordic,led1-mode = "host";
+		nordic,led2-mode = "host";
+	};
 };
 
 /*
