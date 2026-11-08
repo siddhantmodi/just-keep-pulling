@@ -13,7 +13,9 @@ if APP_POWER_MANAGER
 
 config APP_POWER_MANAGER_STACK_SIZE
 	int "Power manager thread stack size"
-	default 2048
+	default 3072
+	help
+	  Nordic's fuel gauge library peaks at about 1.6 KB on this thread.
 
 config APP_POWER_MANAGER_PRIORITY
 	int "Power manager thread priority"

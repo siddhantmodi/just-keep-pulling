@@ -1,13 +1,12 @@
 /**
  * @file battery_service.cpp
  * @brief Feeds Zephyr's standard Battery service, for generic apps (e.g. nRF
- *        Connect): its level is estimated from channels::battery. The
- *        Progressor protocol has its own battery command.
+ *        Connect): its level is the fuel gauge's, from channels::battery.
+ *        The Progressor protocol has its own battery command.
  *
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include "battery_level.hpp"
 #include "channels.hpp"
 
 #include <zephyr/bluetooth/services/bas.h>
@@ -48,7 +47,7 @@ namespace
 
 void on_battery( const zbus_channel * /*chan*/ )
 {
-    battery_level.store( ble_svc::battery_level_percent( channels::battery.const_msg().millivolts ), std::memory_order_relaxed );
+    battery_level.store( channels::battery.const_msg().percent, std::memory_order_relaxed );
     k_work_submit( &ble_svc_battery_work );
 }
 

@@ -28,7 +28,7 @@ struct Event {
         client_connection, // a client connected or disconnected (active)
         measurement_state, // a measurement started or stopped (active)
         pull,              // someone pulled on the load cell while measuring
-        battery,           // a battery reading was published (millivolts)
+        battery,           // a battery reading was published (percent)
         blink_step,        // blink timer
     };
 
@@ -36,7 +36,7 @@ struct Event {
     union {
         progressor::Opcode opcode;
         bool active;
-        std::uint32_t millivolts;
+        std::uint8_t percent;
     };
 
     [[nodiscard]] static constexpr Event of( Type type ) noexcept
@@ -54,11 +54,11 @@ struct Event {
         return event;
     }
 
-    [[nodiscard]] static constexpr Event battery_reading( std::uint32_t millivolts ) noexcept
+    [[nodiscard]] static constexpr Event battery_reading( std::uint8_t percent ) noexcept
     {
         Event event{};
         event.type = Type::battery;
-        event.millivolts = millivolts;
+        event.percent = percent;
         return event;
     }
 

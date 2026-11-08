@@ -44,7 +44,7 @@ FIT_REJECTED = 3
 # load_cell_svc's defaults.
 DEFAULT_SAMPLE_RATE = 175
 
-# The Battery service's estimate for the emulated nPM1300's 3750 mV (ble_svc's battery_level.hpp).
+# The Battery service's level for the emulated nPM1300's 3750 mV (native_sim's CurveGauge).
 EMULATED_BATTERY_PERCENT = 25
 
 

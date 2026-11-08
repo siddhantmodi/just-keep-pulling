@@ -23,9 +23,9 @@ fw::Result<> Indicator::on_client_connection( bool connected )
     return show();
 }
 
-fw::Result<> Indicator::on_battery( std::uint32_t millivolts )
+fw::Result<> Indicator::on_battery( std::uint8_t percent )
 {
-    bool const low = millivolts <= low_battery_led_mv;
+    bool const low = percent <= low_battery_led_percent;
     if( low && !low_battery_ ) {
         step_ = 0; // start a blink with the LED on
     }

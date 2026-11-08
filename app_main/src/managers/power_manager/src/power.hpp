@@ -11,6 +11,7 @@
 #pragma once
 
 #include "ble_svc.hpp"
+#include "gauge.hpp"
 #include "pmic_svc.hpp"
 
 #include <chrono>
@@ -24,7 +25,8 @@ namespace power_manager
 /** @brief At or below this, on battery alone, the device warns and powers off (Crimpdeq's: the 3.3 V rail drops out below). */
 inline constexpr std::uint32_t low_battery_mv = 3300;
 
-inline constexpr std::chrono::milliseconds check_interval{ 30'000 };
+/** @brief Often enough for the fuel gauge, whose current readings are single samples of a bursty load. */
+inline constexpr std::chrono::milliseconds check_interval{ 5'000 };
 /** @brief A low reading is confirmed by another this much later, so a load transient (e.g. a radio burst) doesn't power off. */
 inline constexpr std::chrono::milliseconds confirm_delay{ 1'000 };
 /** @brief Time for the low-power warning to reach the client before power goes (Crimpdeq's). */
@@ -39,13 +41,14 @@ inline constexpr std::chrono::milliseconds warning_delay{ 500 };
 class Power
 {
 public:
-    constexpr Power( pmic_svc::IPmic &pmic, ble_svc::IClient &client ) noexcept
+    constexpr Power( pmic_svc::IPmic &pmic, ble_svc::IClient &client, Gauge &gauge ) noexcept
         : pmic_{ pmic }
         , client_{ client }
+        , gauge_{ gauge }
     {
     }
 
-    /** @brief Read and publish the battery, and act on a low reading. */
+    /** @brief Read the battery, feed the fuel gauge, publish both, and act on a low reading. */
     [[nodiscard]] fw::Result<> check();
 
     /** @brief When to check the battery next: the interval, or sooner to confirm a low reading or power off. */
@@ -67,8 +70,12 @@ private:
 
     pmic_svc::IPmic &pmic_;
     ble_svc::IClient &client_;
+    Gauge &gauge_;
     State state_{ State::monitoring };
     std::chrono::milliseconds next_check_{ check_interval };
+    bool checked_{ false };
+    std::chrono::milliseconds since_reading_{ 0 }; // for the fuel gauge
+    std::uint8_t percent_{ 0 };
 };
 
 } // namespace power_manager

@@ -88,6 +88,9 @@ fw::Result<> Activity::sleep()
     if( auto ret = indicator_.on_sleep( true ); !ret ) {
         LOG_WRN( "LED not turned off: %d", fw::err::to_zephyr( ret.error() ) );
     }
+    if( auto saved = gauge_.save(); !saved ) {
+        LOG_WRN( "fuel gauge state not saved: %d", fw::err::to_zephyr( saved.error() ) );
+    }
     auto ret = motion_.sleep_until_moved();
     // Still running: sleeping failed, or this board can't (native_sim). Start counting again.
     if( auto shown = indicator_.on_sleep( false ); !shown ) {

@@ -1,6 +1,6 @@
 /**
  * @file test_activity.cpp
- * @brief Unit tests of power_manager::Activity against a mocked IMU and client.
+ * @brief Unit tests of power_manager::Activity against a mocked IMU, client and fuel gauge.
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -12,8 +12,10 @@
 
 #include <chrono>
 #include <expected>
+#include <fw/settings.hpp>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
+#include <hal/mocks/mock_fuel_gauge.hpp>
 #include <system_error>
 
 namespace
@@ -22,6 +24,7 @@ namespace
 using namespace std::chrono_literals;
 using power_manager::activity_check_interval;
 using progressor::Opcode;
+using testing::_;
 using testing::NiceMock;
 using testing::Return;
 using testing::StrictMock;
@@ -37,6 +40,11 @@ protected:
         EXPECT_CALL( motion_, moved() ).Times( testing::AnyNumber() );
     }
 
+    void SetUp() override
+    {
+        ASSERT_TRUE( fw::settings::init() );
+    }
+
     /** @brief Run the checks that fit in @p duration, all expected to succeed. */
     void idle_for( std::chrono::seconds duration )
     {
@@ -49,7 +57,9 @@ protected:
     StrictMock<ble_svc::MockClient> client_;
     NiceMock<led_svc::MockLed> led_;
     power_manager::Indicator indicator_{ led_ };
-    power_manager::Activity activity_{ motion_, client_, indicator_, timeouts };
+    NiceMock<hal::mocks::MockFuelGauge> fuel_;
+    power_manager::Gauge gauge_{ fuel_ };
+    power_manager::Activity activity_{ motion_, client_, indicator_, gauge_, timeouts };
 };
 
 TEST_F( ActivityTest, CountsIdleTime )
@@ -61,6 +71,17 @@ TEST_F( ActivityTest, CountsIdleTime )
 TEST_F( ActivityTest, SleepsAfterTheTimeoutWithoutAClient )
 {
     idle_for( 230s );
+    EXPECT_CALL( motion_, sleep_until_moved() ).WillOnce( Return( fw::Result<>{} ) );
+    EXPECT_TRUE( activity_.check() );
+}
+
+TEST_F( ActivityTest, SavesTheGaugeBeforeSleeping )
+{
+    ON_CALL( fuel_, state_size() ).WillByDefault( Return( 4 ) );
+    ASSERT_TRUE( gauge_.update( {}, 0s ) ); // started, so there is a state to save
+    idle_for( 230s );
+    testing::InSequence const in_order;
+    EXPECT_CALL( fuel_, save_state( _ ) ).WillOnce( Return( fw::Result<>{} ) );
     EXPECT_CALL( motion_, sleep_until_moved() ).WillOnce( Return( fw::Result<>{} ) );
     EXPECT_TRUE( activity_.check() );
 }

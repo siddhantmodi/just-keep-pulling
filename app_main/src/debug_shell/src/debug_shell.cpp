@@ -110,9 +110,11 @@ int cmd_battery( const shell *sh, size_t /*argc*/, char ** /*argv*/ )
         shell_error( sh, "no reading: %d", fw::err::to_zephyr( battery.error() ) );
         return fw::err::to_zephyr( battery.error() );
     }
-    shell_print( sh, "%u mV, %d uA, die %d.%01d C, %s, USB %s", static_cast<unsigned>( battery->millivolts ), static_cast<int>( battery->microamps ),
-                 static_cast<int>( battery->die_millicelsius / 1000 ), static_cast<int>( std::abs( battery->die_millicelsius / 100 ) % 10 ),
-                 charge_name( battery->charge ), battery->external_power ? "present" : "absent" );
+    hal::BatteryStatus const &status = battery->status;
+    shell_print( sh, "%u %%, %u mV, %d uA, die %d.%01d C, %s, USB %s", battery->percent, static_cast<unsigned>( status.millivolts ),
+                 static_cast<int>( status.microamps ), static_cast<int>( status.die_millicelsius / 1000 ),
+                 static_cast<int>( std::abs( status.die_millicelsius / 100 ) % 10 ), charge_name( status.charge ),
+                 status.external_power ? "present" : "absent" );
     return 0;
 }
 
@@ -127,6 +129,7 @@ SHELL_STATIC_SUBCMD_SET_CREATE( jkp_rate_cmds, SHELL_CMD_ARG( set, NULL, "Set th
                                 SHELL_SUBCMD_SET_END );
 SHELL_STATIC_SUBCMD_SET_CREATE( jkp_cmds, SHELL_CMD( id, &jkp_id_cmds, "Show the device ID; jkp id set <12 hex digits> sets it", cmd_id ),
                                 SHELL_CMD( rate, &jkp_rate_cmds, "Show the sample rate; jkp rate set <SPS> sets it", cmd_rate ),
-                                SHELL_CMD( battery, NULL, "Show the latest battery reading (every 30 s)", cmd_battery ), SHELL_SUBCMD_SET_END );
+                                SHELL_CMD( battery, NULL, "Show the latest battery reading and state of charge (every 5 s)", cmd_battery ),
+                                SHELL_SUBCMD_SET_END );
 SHELL_CMD_REGISTER( jkp, &jkp_cmds, "Dynamometer debug commands", NULL );
 // NOLINTEND(modernize-avoid-c-arrays,modernize-use-nullptr,performance-no-int-to-ptr)

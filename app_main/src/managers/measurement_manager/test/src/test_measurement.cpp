@@ -450,7 +450,7 @@ TEST_F( MeasurementTest, AnswersTheProgressorIdLeastSignificantByteFirst )
 
 TEST_F( MeasurementTest, AnswersTheLatestBatteryReading )
 {
-    ASSERT_TRUE( channels::battery.publish( { .millivolts = 3812, .charge = hal::ChargeState::idle, .external_power = false }, K_NO_WAIT ) );
+    ASSERT_TRUE( channels::battery.publish( { .status = { .millivolts = 3812 }, .percent = 50 }, K_NO_WAIT ) );
 
     ASSERT_TRUE( measurement_.handle( command( Opcode::sample_battery ) ) );
     ASSERT_EQ( sent_.size(), 1U );

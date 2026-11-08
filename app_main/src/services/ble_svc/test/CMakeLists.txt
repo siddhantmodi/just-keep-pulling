@@ -7,7 +7,7 @@ project(test_ble_svc)
 
 target_compile_options(app PRIVATE -Werror)
 
-# Only the advertised name, the battery level and the JustKeepPulling values are unit tested;
+# Only the advertised name and the JustKeepPulling values are unit tested;
 # the GATT adapters are covered by the Bumble integration tests (docs/architecture.md, rule 5).
 target_include_directories(app PRIVATE
     ../src
@@ -16,6 +16,5 @@ target_include_directories(app PRIVATE
 
 target_sources(app PRIVATE
     src/test_advertising.cpp
-    src/test_battery_level.cpp
     src/test_jkp_protocol.cpp
 )

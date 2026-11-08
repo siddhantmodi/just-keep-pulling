@@ -22,6 +22,10 @@ namespace power_manager
 
 fw::Result<> Power::check()
 {
+    if( checked_ ) {
+        since_reading_ += next_check_;
+    }
+    checked_ = true;
     return state_ == State::powering_off ? power_off() : check_battery();
 }
 
@@ -38,7 +42,13 @@ fw::Result<> Power::check_battery()
         monitor();
         return std::unexpected( status.error() );
     }
-    if( auto ret = channels::battery.publish( *status, channels::lock_timeout ); !ret ) {
+    if( auto level = gauge_.update( *status, since_reading_ ); level ) {
+        percent_ = *level;
+    } else {
+        LOG_WRN( "fuel gauge update failed: %d", fw::err::to_zephyr( level.error() ) );
+    }
+    since_reading_ = std::chrono::milliseconds{ 0 };
+    if( auto ret = channels::battery.publish( { .status = *status, .percent = percent_ }, channels::lock_timeout ); !ret ) {
         LOG_ERR( "battery publish failed: %d", fw::err::to_zephyr( ret.error() ) );
     }
 
@@ -68,6 +78,9 @@ fw::Result<> Power::check_battery()
 
 fw::Result<> Power::power_off()
 {
+    if( auto saved = gauge_.save(); !saved ) {
+        LOG_WRN( "fuel gauge state not saved: %d", fw::err::to_zephyr( saved.error() ) );
+    }
     auto ret = pmic_.ship_mode();
     // Still running: ship mode failed, or this board stays powered (native_sim).
     monitor();

@@ -66,6 +66,11 @@ struct CalibrationState {
     float factor_g_per_code; // grams per ADC code
 };
 
+struct Battery {
+    hal::BatteryStatus status;
+    std::uint8_t percent; // state of charge, from the fuel gauge
+};
+
 } // namespace channels
 
 ZBUS_CHAN_DECLARE( progressor_command_chan, client_connection_chan, measurement_state_chan, battery_chan, config_command_chan, calibration_state_chan,
@@ -86,8 +91,8 @@ inline constexpr fw::ChannelRef<progressor::Command> progressor_command{ progres
 inline constexpr fw::ChannelRef<ClientConnection> client_connection{ client_connection_chan };
 /** @brief Published by the measurement manager when a measurement starts or stops. */
 inline constexpr fw::ChannelRef<MeasurementState> measurement_state{ measurement_state_chan };
-/** @brief The latest battery reading, published by the power manager at boot and then periodically. */
-inline constexpr fw::ChannelRef<hal::BatteryStatus> battery{ battery_chan };
+/** @brief The latest battery reading and state of charge, published by the power manager at boot and then periodically. */
+inline constexpr fw::ChannelRef<Battery> battery{ battery_chan };
 /** @brief Configuration requests for the measurement manager, which owns the load cell. */
 inline constexpr fw::ChannelRef<ConfigCommand> config_command{ config_command_chan };
 /** @brief Published by the measurement manager at start and after each calibration request. */

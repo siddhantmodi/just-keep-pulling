@@ -55,6 +55,8 @@
 	/* 1000 mAh LiPo (JLJLUP): 500 mA (0.5C, a standard LiPo charge rate) to 4.2 V, within the 500 mA USB budget. */
 	term-microvolt = <4200000>;
 	current-microamp = <500000>;
+	/* The lower limit, for 5x finer battery current readings (0.22 mA) for the fuel gauge. */
+	dischg-limit-microamp = <200000>;
 	/*
 	 * No battery thermistor assumed: the charger ignores its NTC input, so it
 	 * charges without temperature limits (no cut-off below 0 C or above 45 C).

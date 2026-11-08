@@ -7,9 +7,9 @@ project(test_power_manager)
 
 target_compile_options(app PRIVATE -Werror)
 
-# The Power, Activity and Indicator classes with a mocked PMIC, IMU, LED and client (each
-# component's own mock), the app's real zbus channels and the real progressor
-# encoding.
+# The Power, Activity, Indicator and Gauge classes with a mocked PMIC, IMU, LED, client
+# and fuel gauge (each component's or the HAL's own mock), the app's real zbus channels
+# and settings, and the real progressor encoding.
 target_include_directories(app PRIVATE
     ../inc
     ../src
@@ -29,9 +29,12 @@ target_sources(app PRIVATE
     ../../../channels/src/channels.cpp
     ../../../modules/progressor/src/progressor.cpp
     ../src/activity.cpp
+    ../src/gauge.cpp
     ../src/indicator.cpp
     ../src/power.cpp
     src/test_activity.cpp
+    src/test_curve_gauge.cpp
+    src/test_gauge.cpp
     src/test_indicator.cpp
     src/test_power.cpp
 )

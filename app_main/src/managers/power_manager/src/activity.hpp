@@ -16,6 +16,7 @@
 #pragma once
 
 #include "ble_svc.hpp"
+#include "gauge.hpp"
 #include "indicator.hpp"
 #include "motion_svc.hpp"
 #include "progressor.hpp"
@@ -37,10 +38,11 @@ struct IdleTimeouts {
 class Activity
 {
 public:
-    constexpr Activity( motion_svc::IMotion &motion, ble_svc::IClient &client, Indicator &indicator, IdleTimeouts timeouts ) noexcept
+    constexpr Activity( motion_svc::IMotion &motion, ble_svc::IClient &client, Indicator &indicator, Gauge &gauge, IdleTimeouts timeouts ) noexcept
         : motion_{ motion }
         , client_{ client }
         , indicator_{ indicator }
+        , gauge_{ gauge }
         , timeouts_{ timeouts }
     {
     }
@@ -66,6 +68,7 @@ private:
     motion_svc::IMotion &motion_;
     ble_svc::IClient &client_;
     Indicator &indicator_;
+    Gauge &gauge_;
     IdleTimeouts timeouts_;
     std::chrono::seconds idle_{ 0 };
     bool connected_{ false };

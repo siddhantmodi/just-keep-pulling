@@ -21,7 +21,7 @@
 namespace power_manager
 {
 
-inline constexpr std::uint32_t low_battery_led_mv = 3500;
+inline constexpr std::uint8_t low_battery_led_percent = 10;
 inline constexpr std::chrono::milliseconds blink_step{ 250 };
 /** @brief Steps per blink period: one on, the rest off. */
 inline constexpr unsigned blink_steps = 4;
@@ -37,7 +37,7 @@ public:
     /** @brief Show the initial state: no client yet. */
     [[nodiscard]] fw::Result<> start();
     [[nodiscard]] fw::Result<> on_client_connection( bool connected );
-    [[nodiscard]] fw::Result<> on_battery( std::uint32_t millivolts );
+    [[nodiscard]] fw::Result<> on_battery( std::uint8_t percent );
     [[nodiscard]] fw::Result<> on_sleep( bool sleeping );
     [[nodiscard]] fw::Result<> on_blink_step();
 

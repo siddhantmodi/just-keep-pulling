@@ -89,7 +89,7 @@ fw::Result<> Measurement::on_command( const progressor::Command &command )
         if( !battery ) {
             return std::unexpected( battery.error() );
         }
-        return reply( progressor::encode_battery_voltage( battery->millivolts ) );
+        return reply( progressor::encode_battery_voltage( battery->status.millivolts ) );
     }
     case Opcode::get_progressor_id:
         return reply( progressor::encode_progressor_id( id_ ) );

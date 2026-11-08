@@ -72,7 +72,7 @@ TEST_F( IndicatorTest, GreenWithAClient )
 TEST_F( IndicatorTest, BlinksRedOnALowBattery )
 {
     ASSERT_TRUE( indicator_.on_client_connection( true ) );
-    ASSERT_TRUE( indicator_.on_battery( 3500 ) );
+    ASSERT_TRUE( indicator_.on_battery( 10 ) );
 
     EXPECT_TRUE( indicator_.blinking() );
     EXPECT_EQ( color_, Color::red ); // starts on
@@ -81,8 +81,8 @@ TEST_F( IndicatorTest, BlinksRedOnALowBattery )
 
 TEST_F( IndicatorTest, StopsBlinkingWhenTheBatteryRecovers )
 {
-    ASSERT_TRUE( indicator_.on_battery( 3400 ) );
-    ASSERT_TRUE( indicator_.on_battery( 3600 ) );
+    ASSERT_TRUE( indicator_.on_battery( 5 ) );
+    ASSERT_TRUE( indicator_.on_battery( 50 ) );
 
     EXPECT_FALSE( indicator_.blinking() );
     EXPECT_EQ( color_, Color::blue );
@@ -90,7 +90,7 @@ TEST_F( IndicatorTest, StopsBlinkingWhenTheBatteryRecovers )
 
 TEST_F( IndicatorTest, OffWhileSleeping )
 {
-    ASSERT_TRUE( indicator_.on_battery( 3400 ) );
+    ASSERT_TRUE( indicator_.on_battery( 5 ) );
     ASSERT_TRUE( indicator_.on_sleep( true ) );
 
     EXPECT_EQ( color_, Color::off );
@@ -103,8 +103,8 @@ TEST_F( IndicatorTest, OffWhileSleeping )
 TEST_F( IndicatorTest, OnlyWritesTheLedWhenTheColorChanges )
 {
     ASSERT_TRUE( indicator_.start() );
-    ASSERT_TRUE( indicator_.on_battery( 3900 ) );
-    ASSERT_TRUE( indicator_.on_battery( 3800 ) );
+    ASSERT_TRUE( indicator_.on_battery( 80 ) );
+    ASSERT_TRUE( indicator_.on_battery( 60 ) );
 
     EXPECT_EQ( shown_, ( std::vector{ Color::blue } ) );
 }

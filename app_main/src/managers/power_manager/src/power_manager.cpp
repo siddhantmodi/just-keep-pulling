@@ -2,7 +2,8 @@
  * @file power_manager.cpp
  * @brief The power manager's plumbing: timers and a zbus listener feeding its
  *        event queue, and the thread that hands events to power_manager::Power
- *        (battery) and power_manager::Activity (inactivity).
+ *        (battery) and power_manager::Activity (inactivity). The fuel gauge is
+ *        Nordic's library where it is built, else the voltage curve (native_sim).
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -13,12 +14,14 @@
 #include "ble_svc.hpp"
 #include "channels.hpp"
 #include "event.hpp"
+#include "gauge.hpp"
 #include "indicator.hpp"
 #include "led_svc.hpp"
 #include "motion_svc.hpp"
 #include "pmic_svc.hpp"
 #include "power.hpp"
 
+#include <zephyr/devicetree.h>
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/zbus/zbus.h>
@@ -27,6 +30,11 @@
 #include <chrono>
 #include <cstdint>
 #include <fw/queue_ref.hpp>
+#if defined( CONFIG_NRF_FUEL_GAUGE )
+#include <hal/zephyr/nrf_fuel_gauge.hpp>
+#else
+#include "curve_gauge.hpp"
+#endif
 
 LOG_MODULE_DECLARE( power_manager, CONFIG_APP_POWER_MANAGER_LOG_LEVEL );
 
@@ -38,10 +46,24 @@ namespace
 
 using power_manager::Event;
 
+#if defined( CONFIG_NRF_FUEL_GAUGE )
+/** @brief Nordic's model of the LiPol LP602760, a 1000 mAh cell like the one fitted. */
+const battery_model battery_model_lp602760{
+#include "battery_model_lp602760.inc"
+};
+
+constexpr std::uint32_t charge_microamps = DT_PROP( DT_ALIAS( pmic_charger ), current_microamp );
+constexpr std::uint32_t term_microamps = charge_microamps / 100 * DT_PROP_OR( DT_ALIAS( pmic_charger ), term_current_percent, 10 );
+constinit hal::zephyr::NrfFuelGauge fuel_gauge{ battery_model_lp602760, charge_microamps, term_microamps };
+#else
+constinit power_manager::CurveGauge fuel_gauge{};
+#endif
+constinit power_manager::Gauge gauge{ fuel_gauge };
+
 /** @brief The production logic, built on first use: its dependencies come from other files, so it cannot be constinit. */
 power_manager::Power &power()
 {
-    static power_manager::Power instance{ pmic_svc::pmic(), ble_svc::client() };
+    static power_manager::Power instance{ pmic_svc::pmic(), ble_svc::client(), gauge };
     return instance;
 }
 
@@ -56,6 +78,7 @@ power_manager::Activity &activity()
     static power_manager::Activity instance{ motion_svc::motion(),
                                              ble_svc::client(),
                                              indicator(),
+                                             gauge,
                                              { .disconnected = std::chrono::seconds{ CONFIG_APP_POWER_MANAGER_IDLE_TIMEOUT_S },
                                                .connected = std::chrono::seconds{ CONFIG_APP_POWER_MANAGER_CONNECTED_IDLE_TIMEOUT_S } } };
     return instance;
@@ -104,7 +127,7 @@ void on_message( const zbus_channel *chan )
     } else if( channels::pull.is( chan ) ) {
         post( Event::of( Event::Type::pull ) );
     } else if( channels::battery.is( chan ) ) {
-        post( Event::battery_reading( channels::battery.const_msg().millivolts ) );
+        post( Event::battery_reading( channels::battery.const_msg().percent ) );
     }
 }
 
@@ -172,7 +195,7 @@ fw::Result<> handle( const Event &event )
         activity().on_pull();
         return {};
     case Event::Type::battery:
-        return indicator().on_battery( event.millivolts );
+        return indicator().on_battery( event.percent );
     case Event::Type::blink_step:
         return indicator().on_blink_step();
     }

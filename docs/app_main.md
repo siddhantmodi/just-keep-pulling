@@ -2,7 +2,7 @@
 
 How `app_main`'s interfaces, classes, modules and drivers fit together, and what each offers. Keep this diagram in step with the code: a change to an interface or a new component updates it in the same commit.
 
-Conventions: `<<interface>>` classes are the seams that tests mock; a solid arrow is a reference held by an object, a dashed arrow is a call or use. Methods return `fw::Result` (`Result~T~` here) unless shown otherwise. Mocks (`hal::mocks::MockLoadCellAdc`, `MockBatteryCharger`, `MockPowerOff`, `MockMotionSensor`, `load_cell_svc::MockLoadCell`, `ble_svc::MockClient`, `pmic_svc::MockPmic`, `motion_svc::MockMotion`, `led_svc::MockLed`) implement each interface for unit tests and are left out to keep the diagram readable.
+Conventions: `<<interface>>` classes are the seams that tests mock; a solid arrow is a reference held by an object, a dashed arrow is a call or use. Methods return `fw::Result` (`Result~T~` here) unless shown otherwise. Mocks (`hal::mocks::MockLoadCellAdc`, `MockBatteryCharger`, `MockFuelGauge`, `MockPowerOff`, `MockMotionSensor`, `load_cell_svc::MockLoadCell`, `ble_svc::MockClient`, `pmic_svc::MockPmic`, `motion_svc::MockMotion`, `led_svc::MockLed`) implement each interface for unit tests and are left out to keep the diagram readable.
 
 ```mermaid
 classDiagram
@@ -37,11 +37,21 @@ classDiagram
             +next_check() milliseconds
             is_low(BatteryStatus) bool
         }
+        class Gauge {
+            <<manager thread: fuel gauge state>>
+            +update(BatteryStatus, elapsed) Result~percent~
+            +save() Result
+            settings key power/gauge
+        }
+        class CurveGauge {
+            <<native_sim>>
+            voltage curve, no state
+        }
         class Indicator {
             <<manager thread: status LED>>
             +start() Result
             +on_client_connection(bool) Result
-            +on_battery(mV) Result
+            +on_battery(percent) Result
             +on_sleep(bool) Result
             +on_blink_step() Result
             +blinking() bool
@@ -138,7 +148,7 @@ classDiagram
         }
         class BatteryService {
             <<GATT service: Zephyr BAS>>
-            battery_level_percent(mV) uint8
+            level: battery.percent
             Device Information: Kconfig only
         }
         class JkpService {
@@ -203,7 +213,8 @@ classDiagram
         }
         class battery {
             <<zbus>>
-            hal::BatteryStatus
+            hal::BatteryStatus status
+            uint8 percent
         }
         class measurement_state {
             <<zbus>>
@@ -277,8 +288,22 @@ classDiagram
         }
         class BatteryStatus {
             +uint32 millivolts
-            +bool charging
+            +int32 microamps
+            +int32 die_millicelsius
+            +ChargeState charge
             +bool external_power
+            +charging() bool
+        }
+        class IFuelGauge {
+            <<interface>>
+            +init(BatteryStatus, saved_state) Result
+            +update(BatteryStatus, elapsed) Result~float~
+            +state_size() size_t
+            +save_state(span) Result
+        }
+        class NrfFuelGauge {
+            <<hal::zephyr>>
+            Nordic nRF Fuel Gauge, LP602760 model
         }
         class IPowerOff {
             <<interface>>
@@ -386,6 +411,11 @@ classDiagram
     Power --> IPmic : pmic_
     Power --> IClient : low-power warning
     Power ..> battery : publishes
+    Power --> Gauge : gauge_
+    Activity --> Gauge : save before sleeping
+    Gauge --> IFuelGauge : gauge_
+    IFuelGauge <|.. NrfFuelGauge
+    IFuelGauge <|.. CurveGauge
     Indicator --> ILed : led_
     Activity --> Indicator : off while asleep
     battery ..> Indicator : listener, queue
@@ -427,11 +457,11 @@ classDiagram
 
 The measurement manager's thread takes `Event`s off its queue (fed by a zbus listener on its three channels) and, while measuring, calls `sample()` between them: each `ForceSample` becomes a `progressor::Sample` with its time since the measurement started, and batches of up to 50 ms (at most what one notification carries) go out through `ble_svc::client()`. It also applies configuration requests from the JustKeepPulling service (`channels::config_command`: a calibration point, a calibration reset, the sample rate) and publishes how calibration went on `channels::calibration_state`, which the service reads and notifies. It is the only caller of `ILoadCell`'s single-threaded operations; the JustKeepPulling service and the debug shell only read the thread-safe sample rate.
 
-The power manager's thread reads the battery every 30 s (its timer posts an `Event`) and publishes it on `channels::battery`, which the measurement manager answers 0x6F from. A reading at or below 3.3 V with no charging or USB power is confirmed 1 s later; then the client gets the 0x04 low-power warning and, 0.5 s later, the PMIC enters ship mode. It is the only caller of `IPmic`.
+The power manager's thread reads the battery every 5 s (its timer posts an `Event`), feeds the reading to the fuel gauge (`Gauge`), and publishes both on `channels::battery`: the measurement manager answers 0x6F with the voltage, and the Battery service and the LED use the state of charge. On the XIAO the gauge is Nordic's nRF Fuel Gauge with the model of the LiPol LP602760 (a 1000 mAh cell like the one fitted), given the nPM1300's voltage, current (200 mA discharge limit, for 0.22 mA steps), charger state and die temperature (no battery thermistor); on native_sim, `CurveGauge` maps the voltage to a typical LiPo curve. The gauge's state is saved to settings every 10 minutes and before System OFF or ship mode, and resumed at boot, so a reset or the power switch costs at most 10 minutes of tracking. A reading at or below 3.3 V with no charging or USB power is confirmed 1 s later; then the client gets the 0x04 low-power warning and, 0.5 s later, the PMIC enters ship mode. It is the only caller of `IPmic`.
 
 The same thread tracks inactivity (`Activity`): a 10 s timer checks for motion and counts idle time, and commands (except battery polls), configuration requests, connections, a measurement starting or stopping, and pulls reset it. The measurement manager publishes a pull (`channels::pull`) when a sample is 2 kg or more from zero, at most every 10 s, so a measurement nobody pulls on (e.g. the app left open) idles like any connection. After 4 minutes idle (10 with a client connected), the client is disconnected and, 10 s later unless something happened meanwhile, the SoC enters System OFF, woken by the IMU's motion interrupt.
 
-It also drives the status LED (`Indicator`), as Crimpdeq: blue without a client, green with one, red blinking (250 ms on, 750 ms off, on a 250 ms timer) at or below 3.5 V, and off before sleeping, since GPIOs keep their state in System OFF.
+It also drives the status LED (`Indicator`), as Crimpdeq: blue without a client, green with one, red blinking (250 ms on, 750 ms off, on a 250 ms timer) at or below 10 %, and off before sleeping, since GPIOs keep their state in System OFF.
 
 ## Production wiring
 
@@ -441,7 +471,7 @@ Each component's production file binds the concrete types (see `docs/architectur
 |---|---|---|
 | `identity_svc::identity()` | `Identity` | settings key `identity/id` |
 | `measurement_manager::start()` | `Measurement` in `measurement_manager.cpp`, built on first use | `load_cell()`, `client()`, and the device ID as at boot; thread priority 2. Started only if the load cell did |
-| `power_manager::start( pmic_ready )` | `Power`, `Activity` and `Indicator` in `power_manager.cpp`, built on first use | `pmic()` (battery checks only if the PMIC started), `motion()`, `led()`, `client()`; idle timeouts from Kconfig; thread priority 7 |
+| `power_manager::start( pmic_ready )` | `Power`, `Activity` and `Indicator` in `power_manager.cpp`, built on first use; `Gauge` on `hal::zephyr::NrfFuelGauge` (`CONFIG_NRF_FUEL_GAUGE`, the XIAO) or `CurveGauge` | `pmic()` (battery checks only if the PMIC started), `motion()`, `led()`, `client()`; idle timeouts from Kconfig; the charger's current and termination settings from devicetree; thread priority 7 |
 | `motion_svc::motion()` | `Motion` on `hal::zephyr::SensorMotion` and `GpioWakeSystemOff` | devicetree alias `motion-sensor`: the XIAO's LSM6DS3TR-C (Zephyr's LSM6DSL driver, patched; deferred init after the PMIC's LDO1), its INT1 (P0.06) waking the SoC; or the emulated chip on native_sim |
 | `led_svc::led()` | `Led` on three Zephyr LEDs (`led_dt_spec`, gpio-leds) | devicetree aliases `status-led-red`, `-green`, `-blue`: the XIAO's RGB LED (active low; red P1.22, green P1.24, blue P1.23, as Seeed's current board files), or emulated GPIOs on native_sim |
 | `pmic_svc::pmic()` | `Pmic` on `hal::zephyr::Npm13xxCharger` and `RegulatorShipMode` | devicetree aliases `pmic-charger` and `pmic-regulators`: the XIAO's nPM1300 (bit-banged I2C on P1.18/P1.17), or the emulated chip on native_sim |
