@@ -87,11 +87,11 @@
 		};
 	};
 
-	/* As Seeed's board. */
+	/* As Seeed's board, but LED1 (the red charge LED) shows charging. */
 	pmic_leds: leds {
 		compatible = "nordic,npm1300-led";
 		nordic,led0-mode = "error";
-		nordic,led1-mode = "host";
+		nordic,led1-mode = "charging";
 		nordic,led2-mode = "host";
 	};
 };
