@@ -152,7 +152,7 @@ Carried now: the LSM6DSL motion (wake-up) trigger, used to sleep when idle and w
 
 ## Build variants
 
-An app's default build is its **release** build. `debug.conf` (added with `-DEXTRA_CONF_FILE=debug.conf`) makes the **debug** build: it enables Zephyr's shell with the app's debug commands (`app_main/src/debug_shell/`, e.g. overwriting the device ID) and asserts, and logs the reset cause at boot. Debug-only code depends on `CONFIG_SHELL`, so it cannot reach a release build; CI builds both and fails if a release build enables the shell. clang-tidy analyzes the debug build, which contains everything the release build does.
+An app's default build is its **release** build. `debug.conf` (added with `-DEXTRA_CONF_FILE=debug.conf`) makes the **debug** build: it enables Zephyr's shell with the app's debug commands (`app_main/src/debug_shell/`, e.g. overwriting the device ID) and asserts, logs the reset cause at boot, and turns on hardware stack protection, so an overflow faults instead of corrupting memory. Debug-only code depends on `CONFIG_SHELL`, so it cannot reach a release build; CI builds both and fails if a release build enables the shell. clang-tidy analyzes the debug build, which contains everything the release build does.
 
 For trying the phone apps on a board without the ADC fitted, `emulated_adc.conf` and `emulated_adc.overlay` (on top of `debug.conf`) put the ADS1220 emulator in place of the ADC, and holding the user button pulls, or the shell's `emul raw <code>` holds a fixed ADC code (`app_main/src/emulated_load/`).
 
