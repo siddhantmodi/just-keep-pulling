@@ -33,7 +33,7 @@ inline constexpr std::chrono::milliseconds warning_delay{ 500 };
 /** @brief Whether @p status calls for powering off: low, and nothing charging or powering the device. */
 [[nodiscard]] constexpr bool is_low( const hal::BatteryStatus &status ) noexcept
 {
-    return status.millivolts <= low_battery_mv && !status.charging && !status.external_power;
+    return status.millivolts <= low_battery_mv && !status.charging() && !status.external_power;
 }
 
 class Power

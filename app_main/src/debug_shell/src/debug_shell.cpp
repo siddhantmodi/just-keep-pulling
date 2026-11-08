@@ -21,8 +21,10 @@
 #include <charconv>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <cstring>
 #include <fw/error.hpp>
+#include <hal/battery_charger.hpp>
 #include <hal/load_cell_adc.hpp>
 #include <system_error>
 
@@ -84,6 +86,23 @@ int cmd_rate_set( const shell *sh, size_t /*argc*/, char **argv )
     return 0;
 }
 
+const char *charge_name( hal::ChargeState charge )
+{
+    switch( charge ) {
+    case hal::ChargeState::trickle:
+        return "trickle charging";
+    case hal::ChargeState::constant_current:
+        return "charging (constant current)";
+    case hal::ChargeState::constant_voltage:
+        return "charging (constant voltage)";
+    case hal::ChargeState::complete:
+        return "charge complete";
+    case hal::ChargeState::idle:
+        break;
+    }
+    return "not charging";
+}
+
 int cmd_battery( const shell *sh, size_t /*argc*/, char ** /*argv*/ )
 {
     auto battery = channels::battery.read( channels::lock_timeout );
@@ -91,8 +110,9 @@ int cmd_battery( const shell *sh, size_t /*argc*/, char ** /*argv*/ )
         shell_error( sh, "no reading: %d", fw::err::to_zephyr( battery.error() ) );
         return fw::err::to_zephyr( battery.error() );
     }
-    shell_print( sh, "%u mV, %s, USB %s", static_cast<unsigned>( battery->millivolts ), battery->charging ? "charging" : "not charging",
-                 battery->external_power ? "present" : "absent" );
+    shell_print( sh, "%u mV, %d uA, die %d.%01d C, %s, USB %s", static_cast<unsigned>( battery->millivolts ), static_cast<int>( battery->microamps ),
+                 static_cast<int>( battery->die_millicelsius / 1000 ), static_cast<int>( std::abs( battery->die_millicelsius / 100 ) % 10 ),
+                 charge_name( battery->charge ), battery->external_power ? "present" : "absent" );
     return 0;
 }
 

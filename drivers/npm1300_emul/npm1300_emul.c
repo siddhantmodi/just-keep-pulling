@@ -35,6 +35,7 @@ LOG_MODULE_REGISTER( npm1300_emul, CONFIG_JKP_NPM1300_EMUL_LOG_LEVEL );
 #define CHGR_BASE                    0x03U
 #define CHGR_OFFSET_STATUS           0x34U
 #define CHGR_STATUS_BATTERY_DETECTED 0x01U
+#define CHGR_STATUS_COMPLETED        0x02U
 #define CHGR_STATUS_CONSTANT_CURRENT 0x08U
 
 #define ADC_BASE             0x05U
@@ -64,6 +65,7 @@ struct npm1300_emul_data {
     uint8_t offset;
     uint32_t battery_mv;
     bool charging;
+    bool charge_complete;
     bool vbus;
     bool ship_mode;
 };
@@ -85,7 +87,8 @@ static void fill_adc_results( struct npm1300_emul_data *data )
 
 static void update_status( struct npm1300_emul_data *data )
 {
-    data->registers[CHGR_BASE][CHGR_OFFSET_STATUS] = CHGR_STATUS_BATTERY_DETECTED | ( data->charging ? CHGR_STATUS_CONSTANT_CURRENT : 0U );
+    data->registers[CHGR_BASE][CHGR_OFFSET_STATUS] = CHGR_STATUS_BATTERY_DETECTED | ( data->charging ? CHGR_STATUS_CONSTANT_CURRENT : 0U ) |
+                                                     ( data->charge_complete ? CHGR_STATUS_COMPLETED : 0U );
     data->registers[VBUS_BASE][VBUS_OFFSET_STATUS] = data->vbus ? VBUS_STATUS_PRESENT : 0U;
 }
 
@@ -164,6 +167,17 @@ void npm1300_emul_set_charging( const struct emul *target, bool charging )
     K_SPINLOCK( &data->lock )
     {
         data->charging = charging;
+        update_status( data );
+    }
+}
+
+void npm1300_emul_set_charge_complete( const struct emul *target, bool complete )
+{
+    struct npm1300_emul_data *data = target->data;
+
+    K_SPINLOCK( &data->lock )
+    {
+        data->charge_complete = complete;
         update_status( data );
     }
 }

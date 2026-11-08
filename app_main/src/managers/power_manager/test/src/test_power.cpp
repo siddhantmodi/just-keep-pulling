@@ -26,8 +26,8 @@ using testing::NiceMock;
 using testing::Return;
 using testing::StrictMock;
 
-constexpr hal::BatteryStatus healthy{ .millivolts = 3900, .charging = false, .external_power = false };
-constexpr hal::BatteryStatus low{ .millivolts = 3300, .charging = false, .external_power = false };
+constexpr hal::BatteryStatus healthy{ .millivolts = 3900, .charge = hal::ChargeState::idle, .external_power = false };
+constexpr hal::BatteryStatus low{ .millivolts = 3300, .charge = hal::ChargeState::idle, .external_power = false };
 
 class PowerTest : public testing::Test
 {
@@ -56,16 +56,16 @@ protected:
 
 TEST( IsLow, AtOrBelowTheThresholdOnBatteryAlone )
 {
-    EXPECT_TRUE( power_manager::is_low( { .millivolts = 3300, .charging = false, .external_power = false } ) );
-    EXPECT_TRUE( power_manager::is_low( { .millivolts = 3000, .charging = false, .external_power = false } ) );
-    EXPECT_FALSE( power_manager::is_low( { .millivolts = 3301, .charging = false, .external_power = false } ) );
+    EXPECT_TRUE( power_manager::is_low( { .millivolts = 3300, .charge = hal::ChargeState::idle, .external_power = false } ) );
+    EXPECT_TRUE( power_manager::is_low( { .millivolts = 3000, .charge = hal::ChargeState::idle, .external_power = false } ) );
+    EXPECT_FALSE( power_manager::is_low( { .millivolts = 3301, .charge = hal::ChargeState::idle, .external_power = false } ) );
 }
 
 TEST( IsLow, NotWhileChargingOrOnUsb )
 {
-    EXPECT_FALSE( power_manager::is_low( { .millivolts = 3200, .charging = true, .external_power = true } ) );
-    EXPECT_FALSE( power_manager::is_low( { .millivolts = 3200, .charging = false, .external_power = true } ) );
-    EXPECT_FALSE( power_manager::is_low( { .millivolts = 3200, .charging = true, .external_power = false } ) );
+    EXPECT_FALSE( power_manager::is_low( { .millivolts = 3200, .charge = hal::ChargeState::constant_current, .external_power = true } ) );
+    EXPECT_FALSE( power_manager::is_low( { .millivolts = 3200, .charge = hal::ChargeState::idle, .external_power = true } ) );
+    EXPECT_FALSE( power_manager::is_low( { .millivolts = 3200, .charge = hal::ChargeState::constant_current, .external_power = false } ) );
 }
 
 TEST_F( PowerTest, PublishesEachReading )
@@ -157,7 +157,7 @@ TEST_F( PowerTest, AFailedShipModeGoesBackToMonitoring )
 
 TEST_F( PowerTest, ChargingNeverPowersOff )
 {
-    battery_reads( { .millivolts = 3100, .charging = true, .external_power = true } );
+    battery_reads( { .millivolts = 3100, .charge = hal::ChargeState::constant_current, .external_power = true } );
     EXPECT_CALL( pmic_, read_battery() ).Times( 3 );
 
     for( int i = 0; i < 3; ++i ) {

@@ -26,6 +26,7 @@ protected:
     {
         npm1300_emul_set_battery_mv( pmic, 3750 );
         npm1300_emul_set_charging( pmic, false );
+        npm1300_emul_set_charge_complete( pmic, false );
         npm1300_emul_set_vbus( pmic, false );
     }
 
@@ -44,8 +45,16 @@ TEST_F( Npm13xxTest, ReadsTheBatteryVoltage )
     auto status = charger_.read();
     ASSERT_TRUE( status );
     EXPECT_EQ( status->millivolts, 3750U ); // 768 codes of 5000/1024 mV: exact
-    EXPECT_FALSE( status->charging );
+    EXPECT_EQ( status->charge, hal::ChargeState::idle );
     EXPECT_FALSE( status->external_power );
+}
+
+TEST_F( Npm13xxTest, ReadsTheCurrentAndDieTemperature )
+{
+    auto status = charger_.read();
+    ASSERT_TRUE( status );
+    EXPECT_EQ( status->microamps, 0 );
+    EXPECT_NEAR( status->die_millicelsius, 25'000, 1'000 );
 }
 
 TEST_F( Npm13xxTest, ReportsChargingAndUsbPower )
@@ -54,16 +63,27 @@ TEST_F( Npm13xxTest, ReportsChargingAndUsbPower )
     npm1300_emul_set_vbus( pmic, true );
     auto status = charger_.read();
     ASSERT_TRUE( status );
-    EXPECT_TRUE( status->charging );
+    EXPECT_EQ( status->charge, hal::ChargeState::constant_current );
+    EXPECT_TRUE( status->charging() );
     EXPECT_TRUE( status->external_power );
+}
+
+TEST_F( Npm13xxTest, ReportsTheChargeComplete )
+{
+    npm1300_emul_set_charge_complete( pmic, true );
+    npm1300_emul_set_vbus( pmic, true );
+    auto status = charger_.read();
+    ASSERT_TRUE( status );
+    EXPECT_EQ( status->charge, hal::ChargeState::complete );
+    EXPECT_FALSE( status->charging() );
 }
 
 TEST_F( Npm13xxTest, UsbPowerWithoutChargingIsNotCharging )
 {
-    npm1300_emul_set_vbus( pmic, true ); // e.g. charge complete
+    npm1300_emul_set_vbus( pmic, true );
     auto status = charger_.read();
     ASSERT_TRUE( status );
-    EXPECT_FALSE( status->charging );
+    EXPECT_FALSE( status->charging() );
     EXPECT_TRUE( status->external_power );
 }
 

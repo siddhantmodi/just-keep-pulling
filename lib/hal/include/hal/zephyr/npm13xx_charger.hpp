@@ -23,6 +23,7 @@
 #include <expected>
 #include <fw/error.hpp>
 #include <hal/battery_charger.hpp>
+#include <initializer_list>
 #include <system_error>
 
 namespace hal::zephyr
@@ -50,23 +51,49 @@ public:
             return std::unexpected( ret.error() );
         }
         auto voltage = channel( SENSOR_CHAN_GAUGE_VOLTAGE );
+        auto current = channel( SENSOR_CHAN_GAUGE_AVG_CURRENT );
+        auto die = channel( SENSOR_CHAN_DIE_TEMP );
         auto charger = channel( static_cast<sensor_channel>( SENSOR_CHAN_NPM13XX_CHARGER_STATUS ) );
         auto vbus = channel( static_cast<sensor_channel>( SENSOR_CHAN_NPM13XX_CHARGER_VBUS_STATUS ) );
-        if( !voltage || !charger || !vbus ) {
-            return std::unexpected( !voltage ? voltage.error() : !charger ? charger.error() : vbus.error() );
+        for( const auto *result : { &voltage, &current, &die, &charger, &vbus } ) {
+            if( !*result ) {
+                return std::unexpected( result->error() );
+            }
         }
         std::int64_t const millivolts = sensor_value_to_milli( &*voltage );
         return BatteryStatus{
             .millivolts = millivolts > 0 ? static_cast<std::uint32_t>( millivolts ) : 0U,
-            .charging = ( static_cast<std::uint32_t>( charger->val1 ) & charging_mask ) != 0U,
+            .microamps = static_cast<std::int32_t>( sensor_value_to_micro( &*current ) ),
+            .die_millicelsius = static_cast<std::int32_t>( sensor_value_to_milli( &*die ) ),
+            .charge = charge_state( static_cast<std::uint32_t>( charger->val1 ) ),
             .external_power = ( static_cast<std::uint32_t>( vbus->val1 ) & vbus_present ) != 0U,
         };
     }
 
 private:
-    // nPM1300 BCHGCHARGESTATUS: trickle, constant current, constant voltage. VBUSINSTATUS: present.
-    static constexpr std::uint32_t charging_mask = 0x04U | 0x08U | 0x10U;
+    // nPM1300 BCHGCHARGESTATUS bits. VBUSINSTATUS: present.
+    static constexpr std::uint32_t status_complete = 0x02U;
+    static constexpr std::uint32_t status_trickle = 0x04U;
+    static constexpr std::uint32_t status_constant_current = 0x08U;
+    static constexpr std::uint32_t status_constant_voltage = 0x10U;
     static constexpr std::uint32_t vbus_present = 0x01U;
+
+    [[nodiscard]] static constexpr ChargeState charge_state( std::uint32_t status ) noexcept
+    {
+        if( ( status & status_complete ) != 0U ) {
+            return ChargeState::complete;
+        }
+        if( ( status & status_trickle ) != 0U ) {
+            return ChargeState::trickle;
+        }
+        if( ( status & status_constant_current ) != 0U ) {
+            return ChargeState::constant_current;
+        }
+        if( ( status & status_constant_voltage ) != 0U ) {
+            return ChargeState::constant_voltage;
+        }
+        return ChargeState::idle;
+    }
 
     [[nodiscard]] fw::Result<sensor_value> channel( sensor_channel chan ) const
     {

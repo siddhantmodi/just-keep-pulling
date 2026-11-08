@@ -16,12 +16,30 @@
 namespace hal
 {
 
+/** @brief What the charger is doing. */
+enum class ChargeState : std::uint8_t {
+    idle,
+    trickle,
+    constant_current,
+    constant_voltage,
+    complete,
+};
+
 struct BatteryStatus {
-    std::uint32_t millivolts;
-    /** The charger is charging the battery (trickle, constant current or constant voltage). */
-    bool charging;
+    std::uint32_t millivolts{};
+    /** Battery current, as Zephyr's sensor API reports it: positive while charging, negative while discharging. */
+    std::int32_t microamps{};
+    /** The charger's die temperature: the closest to the battery's without a thermistor. */
+    std::int32_t die_millicelsius{};
+    ChargeState charge{ ChargeState::idle };
     /** External power (USB) is present, so the device runs whatever the battery's state. */
-    bool external_power;
+    bool external_power{};
+
+    /** @brief The charger is charging the battery (trickle, constant current or constant voltage). */
+    [[nodiscard]] constexpr bool charging() const noexcept
+    {
+        return charge == ChargeState::trickle || charge == ChargeState::constant_current || charge == ChargeState::constant_voltage;
+    }
 };
 
 class IBatteryCharger

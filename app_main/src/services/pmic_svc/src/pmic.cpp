@@ -34,7 +34,7 @@ fw::Result<hal::BatteryStatus> Pmic::read_battery()
         LOG_ERR( "battery read failed: %d", fw::err::to_zephyr( status.error() ) );
         return status;
     }
-    LOG_DBG( "battery %u mV%s%s", static_cast<unsigned>( status->millivolts ), status->charging ? ", charging" : "",
+    LOG_DBG( "battery %u mV%s%s", static_cast<unsigned>( status->millivolts ), status->charging() ? ", charging" : "",
              status->external_power ? ", USB" : "" );
     return status;
 }

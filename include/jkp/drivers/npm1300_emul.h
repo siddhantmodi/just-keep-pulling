@@ -28,6 +28,9 @@ void npm1300_emul_set_battery_mv( const struct emul *target, uint32_t millivolts
 /** @brief Whether the charger reports charging (constant current) or just a battery detected. */
 void npm1300_emul_set_charging( const struct emul *target, bool charging );
 
+/** @brief Whether the charger reports the charge complete. */
+void npm1300_emul_set_charge_complete( const struct emul *target, bool complete );
+
 /** @brief Whether USB (VBUS) power is present. */
 void npm1300_emul_set_vbus( const struct emul *target, bool present );
 

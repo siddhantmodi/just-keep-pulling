@@ -49,13 +49,13 @@ TEST_F( PmicTest, InitFailsWhenThePowerSwitchIsNotReady )
 
 TEST_F( PmicTest, ReadsTheBattery )
 {
-    hal::BatteryStatus const status{ .millivolts = 3812, .charging = true, .external_power = true };
+    hal::BatteryStatus const status{ .millivolts = 3812, .charge = hal::ChargeState::constant_current, .external_power = true };
     EXPECT_CALL( charger_, read() ).WillOnce( Return( status ) );
 
     auto read = pmic_.read_battery();
     ASSERT_TRUE( read );
     EXPECT_EQ( read->millivolts, 3812U );
-    EXPECT_TRUE( read->charging );
+    EXPECT_TRUE( read->charging() );
     EXPECT_TRUE( read->external_power );
 }
 
