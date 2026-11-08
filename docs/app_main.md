@@ -68,6 +68,7 @@ classDiagram
     class emulated_load {
         <<emulated_adc builds only>>
         user button held: pull to 25 kg
+        emul raw code, emul button
     }
 
     namespace identity_svc {

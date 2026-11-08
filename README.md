@@ -99,7 +99,8 @@ west flash -d build/app_main
 # Debug build: adds logging (with the reset cause at boot) and the shell on the console UART, with "jkp id", "jkp rate" and "jkp battery" commands
 west build -b xiao_nrf54lm20a/nrf54lm20a/cpuapp -d build/app_main-debug just-keep-pulling/app_main -- -DEXTRA_CONF_FILE=debug.conf
 
-# Debug build without the ADC fitted: the ADS1220 emulator stands in, and holding the user button pulls 25 kg
+# Debug build without the ADC fitted: the ADS1220 emulator stands in; holding the user button pulls 25 kg,
+# and the shell's "emul raw <code>" holds a fixed ADC code ("emul button" goes back)
 west build -b xiao_nrf54lm20a/nrf54lm20a/cpuapp -d build/app_main-emul just-keep-pulling/app_main -- \
   -DEXTRA_CONF_FILE="debug.conf;emulated_adc.conf" -DEXTRA_DTC_OVERLAY_FILE=emulated_adc.overlay
 ```

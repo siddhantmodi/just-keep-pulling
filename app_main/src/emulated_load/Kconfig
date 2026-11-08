@@ -5,7 +5,9 @@ config APP_EMULATED_LOAD
 	depends on JKP_ADS1220_EMUL && $(dt_alias_enabled,sw0)
 	help
 	  With the ADS1220 emulator in place of the ADC (emulated_adc.conf),
-	  holding the user button pulls APP_EMULATED_LOAD_PEAK_KG.
+	  holding the user button pulls APP_EMULATED_LOAD_PEAK_KG. In debug
+	  builds, "emul raw <code>" holds a fixed ADC code instead (e.g. for
+	  calibration with known values) and "emul button" goes back.
 
 config APP_EMULATED_LOAD_PEAK_KG
 	int "Emulated pull (kg)"
