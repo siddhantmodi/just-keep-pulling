@@ -104,6 +104,10 @@ west build -b xiao_nrf54lm20a/nrf54lm20a/cpuapp -d build/app_main-debug just-kee
 # and the shell's "emul raw <code>" holds a fixed ADC code ("emul button" goes back)
 west build -b xiao_nrf54lm20a/nrf54lm20a/cpuapp -d build/app_main-emul just-keep-pulling/app_main -- \
   -DEXTRA_CONF_FILE="debug.conf;emulated_adc.conf" -DEXTRA_DTC_OVERLAY_FILE=emulated_adc.overlay
+
+# Battery tests: logs every reading and never sleeps when idle; record with scripts/battery_log.py <port> <csv>
+west build -b xiao_nrf54lm20a/nrf54lm20a/cpuapp -d build/app_main-batlog just-keep-pulling/app_main -- \
+  -DEXTRA_CONF_FILE="debug.conf;battery_log.conf"
 ```
 
 It also builds and runs on `native_sim/native/64`, with an emulated ADS1220.

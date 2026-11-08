@@ -48,6 +48,10 @@ fw::Result<> Power::check_battery()
         LOG_WRN( "fuel gauge update failed: %d", fw::err::to_zephyr( level.error() ) );
     }
     since_reading_ = std::chrono::milliseconds{ 0 };
+    // Parsed by scripts/battery_log.py.
+    LOG_DBG( "battery %u %%, %u mV, %d uA, %d mC, charge %u, usb %u", percent_, static_cast<unsigned>( status->millivolts ),
+             static_cast<int>( status->microamps ), static_cast<int>( status->die_millicelsius ), static_cast<unsigned>( status->charge ),
+             status->external_power ? 1U : 0U );
     if( auto ret = channels::battery.publish( { .status = *status, .percent = percent_ }, channels::lock_timeout ); !ret ) {
         LOG_ERR( "battery publish failed: %d", fw::err::to_zephyr( ret.error() ) );
     }
