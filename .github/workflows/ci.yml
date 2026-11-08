@@ -181,7 +181,7 @@ jobs:
             board: xiao_nrf54lm20a/nrf54lm20a/cpuapp
             board_name: xiao_nrf54lm20a
             variant: debug
-            extra_args: -- -DEXTRA_CONF_FILE=debug.conf
+            cmake_args: -DEXTRA_CONF_FILE=debug.conf
     env:
       BUILD_DIR: build/${{ matrix.app }}-${{ matrix.board_name }}-${{ matrix.variant }}
       ARTIFACT_PREFIX: ${{ matrix.app }}-${{ matrix.board_name }}-${{ matrix.variant }}
@@ -192,8 +192,39 @@ jobs:
         with:
           ccache-key: build-${{ matrix.app }}-${{ matrix.board_name }}-${{ matrix.variant }}
 
+      # Pushes to main sign with our key; other builds (pull requests, which
+      # cannot read secrets) use MCUboot's public development key.
+      - name: Use the release signing key
+        if: github.event_name == 'push'
+        shell: bash
+        env:
+          MCUBOOT_SIGNING_KEY: ${{ secrets.MCUBOOT_SIGNING_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "$MCUBOOT_SIGNING_KEY" ]; then
+            echo "::error::the MCUBOOT_SIGNING_KEY secret is not set"
+            exit 1
+          fi
+          key="$RUNNER_TEMP/mcuboot-signing-key.pem"
+          (umask 077 && printf '%s\n' "$MCUBOOT_SIGNING_KEY" > "$key")
+          echo "SB_CONFIG_BOOT_SIGNATURE_KEY_FILE=\"$key\"" > "$RUNNER_TEMP/signing.conf"
+          echo "SIGNING_ARGS=-DSB_EXTRA_CONF_FILE=$RUNNER_TEMP/signing.conf" >> "$GITHUB_ENV"
+
       - name: Build firmware
-        run: west build -p always -b ${{ matrix.board }} -d "$BUILD_DIR" ${{ matrix.app }} ${{ matrix.extra_args }}
+        run: west build -p always -b ${{ matrix.board }} -d "$BUILD_DIR" ${{ matrix.app }} -- ${{ matrix.cmake_args }} ${SIGNING_ARGS:-}
+
+      - name: Remove the signing key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/mcuboot-signing-key.pem"
+
+      - name: Check pushes are not signed with the development key
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          if grep -q 'root-ed25519.pem' "$BUILD_DIR/mcuboot/zephyr/.config"; then
+            echo "::error::MCUboot was built with its public development key"
+            exit 1
+          fi
 
       - name: Check release builds have no shell
         if: matrix.variant == 'release'
@@ -210,13 +241,13 @@ jobs:
           set -euo pipefail
           image="$BUILD_DIR/${{ matrix.app }}/zephyr"
           mkdir -p artifacts
-          # Only multi-image builds (e.g. with MCUboot) produce a merged.hex.
-          if [ -f "$BUILD_DIR/merged.hex" ]; then
-            cp "$BUILD_DIR/merged.hex" "artifacts/$ARTIFACT_PREFIX-merged.hex"
-          fi
-          for ext in hex bin elf; do
-            cp "$image/zephyr.$ext" "artifacts/$ARTIFACT_PREFIX.$ext"
-          done
+          # MCUboot and the signed app in one file, for flashing over the debug port.
+          python3 "$(west list -f '{abspath}' zephyr)/scripts/build/mergehex.py" \
+            -o "artifacts/$ARTIFACT_PREFIX-merged.hex" "$BUILD_DIR/mcuboot/zephyr/zephyr.hex" "$image/zephyr.signed.hex"
+          # The update for nRF Connect Device Manager (either file).
+          cp "$image/zephyr.signed.bin" "artifacts/$ARTIFACT_PREFIX-update.bin"
+          cp "$BUILD_DIR/dfu_application.zip" "artifacts/$ARTIFACT_PREFIX-update.zip"
+          cp "$image/zephyr.elf" "artifacts/$ARTIFACT_PREFIX.elf"
           cp "$image/.config" "artifacts/$ARTIFACT_PREFIX.config"
           (cd artifacts && sha256sum -- * > SHA256SUMS)
 

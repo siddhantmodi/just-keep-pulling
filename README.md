@@ -147,4 +147,4 @@ scripts/run_clang_tidy.py
 | `unit` | Twister unit tests on `native_sim/native/64` with coverage, ASan and UBSan, then the Zephyr tests that come with `zephyr/patches.yml`; uploads results and the coverage report |
 | `integration` | Twister integration tests (Bumble over BLE) on `native_sim/native/64` after `unit`; uploads results and app logs |
 | `tidy` | `scripts/run_clang_tidy.py` for each app |
-| `build` | Builds each app for its boards once the checks pass (release, and debug for `app_main`; fails if a release build has the shell); uploads `.hex`/`.bin`/`.elf`, `.config` and checksums |
+| `build` | Builds each app for its boards once the checks pass (release, and debug for `app_main`; fails if a release build has the shell). Pushes to `main` are signed with the `MCUBOOT_SIGNING_KEY` secret (and fail if it is missing), pull requests with MCUboot's development key. Uploads MCUboot and the app merged into one `.hex` (for the debug port), the update (`-update.bin`, `-update.zip`), the `.elf`, `.config` and checksums |
