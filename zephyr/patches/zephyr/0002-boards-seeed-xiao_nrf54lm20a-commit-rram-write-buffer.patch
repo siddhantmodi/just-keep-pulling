@@ -1,0 +1,25 @@
+From: Siddhant Modi <siddhant.modi@gmail.com>
+Subject: [PATCH] boards: seeed: xiao_nrf54lm20a: commit the RRAM write buffer after load
+
+The OpenOCD load procedure enables buffered RRAM writes and loads the
+image, but never commits the RRAMC write buffer, so the final partial
+128-bit line is not programmed. Trigger TASKS_COMMITWRITEBUF after
+load_image.
+
+Backport of upstream commit ca77b788f93a ("boards: seeed: xiao_nrf54l:
+share OpenOCD script between L15 and LM20A").
+
+---
+diff --git a/boards/seeed/xiao_nrf54lm20a/support/openocd.cfg b/boards/seeed/xiao_nrf54lm20a/support/openocd.cfg
+index 94511c1cb..078071a22 100644
+--- a/boards/seeed/xiao_nrf54lm20a/support/openocd.cfg
++++ b/boards/seeed/xiao_nrf54lm20a/support/openocd.cfg
+@@ -66,6 +66,8 @@ if {![using_hla]} {
+ proc nrf54lm20a-load {file} {
+     mww 0x5004e500 0x101
+ 	load_image $file
++	# Commit the final partial write line (RRAMC TASKS_COMMITWRITEBUF).
++	mww 0x5004e008 1
+ }
+ 
+ # Define CTRL_AP_NUM explicitly to avoid variable errors

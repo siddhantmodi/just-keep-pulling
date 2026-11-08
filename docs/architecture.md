@@ -146,9 +146,9 @@ Tests construct a fresh instance per test with mocks: no singleton reset, no lin
 
 ## Changes to Zephyr and other dependencies
 
-A missing feature in an upstream driver is added to that driver, written to be submitted upstream, rather than worked around with a driver of our own. Until it is merged and in the NCS version we use, the change is carried as a patch: `zephyr/patches/` holds the files and `zephyr/patches.yml` lists them (Zephyr's `west patch` format), and `west_setup.sh` reverts and re-applies them around every `west update`. Each patch includes what upstream would ask for: an emulator and a test where the subsystem has them, and a commit message ready for the PR (add a `Signed-off-by` when submitting). Drivers for chips Zephyr has no driver for live in `drivers/`.
+A missing feature in an upstream driver is added to that driver, written to be submitted upstream, rather than worked around with a driver of our own. Until it is merged and in the NCS version we use, the change is carried as a patch: `zephyr/patches/` holds the files and `zephyr/patches.yml` lists them (Zephyr's `west patch` format), and `west_setup.sh` reverts and re-applies them around every `west update`. Each patch includes what upstream would ask for: an emulator and a test where the subsystem has them, and a commit message ready for the PR (add a `Signed-off-by` when submitting). Drivers for chips Zephyr has no driver for live in `drivers/`. A fix already upstream but not yet in our NCS version is carried the same way, as a backport (`upstreamable: false`).
 
-Carried now: the LSM6DSL motion (wake-up) trigger, used to sleep when idle and wake on motion.
+Carried now: the LSM6DSL motion (wake-up) trigger, used to sleep when idle and wake on motion; and a backport of Zephyr's fix to the XIAO nRF54LM20A's OpenOCD flashing, which left the image's last RRAM line unprogrammed.
 
 ## Build variants
 

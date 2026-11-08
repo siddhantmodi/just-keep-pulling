@@ -20,3 +20,14 @@ patches:
       driver, which also runs the XIAO nRF54LM20A's LSM6DS3TR-C, plus an
       emulator and a test. app_main uses it for inactivity sleep and
       wake-on-motion. To submit as a Zephyr PR, after a Signed-off-by.
+  - path: zephyr/0002-boards-seeed-xiao_nrf54lm20a-commit-rram-write-buffer.patch
+    sha256sum: cd329a4e5e7da2db0fd472caa9181b4552097b90cf06e21877348baffc69bfab
+    module: deps/zephyr
+    author: Siddhant Modi
+    email: siddhant.modi@gmail.com
+    date: 2026-11-08
+    upstreamable: false
+    comments: |
+      The XIAO nRF54LM20A's OpenOCD load left the image's last RRAM line
+      unprogrammed. Backport of Zephyr ca77b788f93a; drop once NCS's
+      Zephyr includes it.
