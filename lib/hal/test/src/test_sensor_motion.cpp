@@ -45,7 +45,7 @@ bool moved_within( hal::IMotionSensor &sensor, k_timeout_t timeout )
 }
 
 // One instance for the suite: the driver keeps a pointer to its trigger.
-hal::zephyr::SensorMotion motion{ DEVICE_DT_GET( DT_NODELABEL( imu ) ), 63 };
+hal::zephyr::SensorMotion motion{ DEVICE_DT_GET( DT_NODELABEL( imu ) ), 125, 2 };
 
 TEST( SensorMotionTest, InitStartsTheDeferredSensorAndArmsMotion )
 {
@@ -53,7 +53,9 @@ TEST( SensorMotionTest, InitStartsTheDeferredSensorAndArmsMotion )
 
     EXPECT_NE( imu_register( LSM6DSL_REG_CTRL1_XL ) & LSM6DSL_MASK_CTRL1_XL_ODR_XL, 0U ) << "accelerometer running";
     EXPECT_EQ( imu_register( LSM6DSL_REG_CTRL2_G ) & LSM6DSL_MASK_CTRL2_G_ODR_G, 0U ) << "gyroscope off";
-    EXPECT_EQ( imu_register( LSM6DSL_REG_WAKE_UP_THS ) & LSM6DSL_MASK_WAKE_UP_THS_WK_THS, 2U ) << "63 mg";
+    EXPECT_EQ( imu_register( LSM6DSL_REG_WAKE_UP_THS ) & LSM6DSL_MASK_WAKE_UP_THS_WK_THS, 4U ) << "125 mg";
+    EXPECT_EQ( ( imu_register( LSM6DSL_REG_WAKE_UP_DUR ) & LSM6DSL_MASK_WAKE_UP_DUR_WAKE_DUR ) >> LSM6DSL_SHIFT_WAKE_UP_DUR_WAKE_DUR, 2U )
+        << "2 samples";
     EXPECT_NE( imu_register( LSM6DSL_REG_MD1_CFG ) & LSM6DSL_MASK_MD1_CFG_INT1_WU, 0U ) << "wake-up on INT1";
     EXPECT_EQ( imu_register( LSM6DSL_REG_INT1_CTRL ), 0U ) << "nothing else on INT1";
 }

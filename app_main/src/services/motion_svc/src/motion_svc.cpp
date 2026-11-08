@@ -19,7 +19,8 @@
 namespace
 {
 
-constinit hal::zephyr::SensorMotion sensor{ DEVICE_DT_GET( DT_ALIAS( motion_sensor ) ), CONFIG_APP_MOTION_SVC_THRESHOLD_MILLI_G };
+constinit hal::zephyr::SensorMotion sensor{ DEVICE_DT_GET( DT_ALIAS( motion_sensor ) ), CONFIG_APP_MOTION_SVC_THRESHOLD_MILLI_G,
+                                            CONFIG_APP_MOTION_SVC_DURATION_SAMPLES };
 constinit hal::zephyr::GpioWakeSystemOff system_off{ GPIO_DT_SPEC_GET( DT_ALIAS( motion_sensor ), irq_gpios ) };
 constinit motion_svc::Motion instance{ sensor, system_off };
 

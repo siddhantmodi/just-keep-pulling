@@ -3,14 +3,14 @@
  * @brief hal::zephyr::SensorMotion: hal::IMotionSensor over a Zephyr accelerometer's motion trigger.
  *
  * Runs the accelerometer at 26 Hz and sets SENSOR_TRIG_MOTION with a slope
- * threshold, so the sensor interrupts on a change of acceleration (e.g. the
- * LSM6DSL's wake-up interrupt). The trigger handler only records the motion;
+ * threshold and duration, so the sensor interrupts on a change of acceleration
+ * (e.g. the LSM6DSL's wake-up interrupt). The trigger handler only records the motion;
  * moved() reads and clears it.
  *
  * A sensor marked zephyr,deferred-init (one powered by a regulator that
  * starts after the sensors) is initialized by init().
  * @code
- * constinit hal::zephyr::SensorMotion motion{ DEVICE_DT_GET( DT_ALIAS( motion_sensor ) ), 63 };
+ * constinit hal::zephyr::SensorMotion motion{ DEVICE_DT_GET( DT_ALIAS( motion_sensor ) ), 125, 2 };
  * @endcode
  *
  * SPDX-License-Identifier: Apache-2.0
@@ -35,10 +35,14 @@ namespace hal::zephyr
 class SensorMotion final : public IMotionSensor
 {
 public:
-    /** @param threshold_milli_g The change of acceleration that counts as motion. */
-    constexpr SensorMotion( const device *dev, std::int32_t threshold_milli_g ) noexcept
+    /**
+     * @param threshold_milli_g The change of acceleration that counts as motion.
+     * @param duration_samples  How many more samples (at 26 Hz) it must last.
+     */
+    constexpr SensorMotion( const device *dev, std::int32_t threshold_milli_g, std::int32_t duration_samples ) noexcept
         : dev_{ dev }
         , threshold_milli_g_{ threshold_milli_g }
+        , duration_samples_{ duration_samples }
     {
     }
 
@@ -56,6 +60,10 @@ public:
         sensor_value threshold{};
         sensor_ug_to_ms2( threshold_milli_g_ * 1000, &threshold );
         if( auto ret = fw::err::check( sensor_attr_set( dev_, SENSOR_CHAN_ACCEL_XYZ, SENSOR_ATTR_SLOPE_TH, &threshold ) ); !ret ) {
+            return ret;
+        }
+        sensor_value duration{ .val1 = duration_samples_, .val2 = 0 };
+        if( auto ret = fw::err::check( sensor_attr_set( dev_, SENSOR_CHAN_ACCEL_XYZ, SENSOR_ATTR_SLOPE_DUR, &duration ) ); !ret ) {
             return ret;
         }
         return fw::err::check( sensor_trigger_set( dev_, &state_.trigger, on_motion ) );
@@ -83,6 +91,7 @@ private:
 
     const device *dev_;
     std::int32_t threshold_milli_g_;
+    std::int32_t duration_samples_;
     State state_{};
 };
 

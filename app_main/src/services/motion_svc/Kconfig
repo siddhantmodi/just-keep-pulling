@@ -11,12 +11,19 @@ if APP_MOTION_SVC
 
 config APP_MOTION_SVC_THRESHOLD_MILLI_G
 	int "Motion threshold (mg)"
-	default 63
+	default 125
 	help
 	  The change of acceleration that counts as motion. The LSM6DS3TR-C
 	  resolves 1/64 of its +/-2 g range, about 31 mg. To tune on the
 	  device: too low and vibration keeps it awake, too high and picking it
 	  up doesn't wake it.
+
+config APP_MOTION_SVC_DURATION_SAMPLES
+	int "Motion duration (samples at 26 Hz)"
+	default 2
+	range 0 3
+	help
+	  How many more samples the change must last, so a knock doesn't count.
 
 endif # APP_MOTION_SVC
 

@@ -294,7 +294,7 @@ classDiagram
         }
         class SensorMotion {
             <<hal::zephyr>>
-            SENSOR_TRIG_MOTION, slope threshold
+            SENSOR_TRIG_MOTION, slope threshold and duration
         }
         class GpioWakeSystemOff {
             <<hal::zephyr>>
