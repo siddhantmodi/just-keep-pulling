@@ -33,6 +33,12 @@ namespace
     return !all( 0x00 ) && !all( 0xFF );
 }
 
+/** @brief Logs the bytes, not a formatted string: deferred logging would read the string after it is gone. */
+void log_id( const char *what, const DeviceId &id )
+{
+    LOG_INF( "%s %02X%02X%02X%02X%02X%02X", what, id[0], id[1], id[2], id[3], id[4], id[5] );
+}
+
 } // namespace
 
 fw::Result<DeviceId> parse_device_id( std::string_view hex ) noexcept
@@ -69,7 +75,7 @@ fw::Result<> Identity::init()
     auto saved = fw::settings::load<DeviceId>( id_key );
     if( saved && is_usable( *saved ) ) {
         id_ = *saved;
-        LOG_INF( "device ID %s", format_device_id( id_ ).data() );
+        log_id( "device ID", id_ );
         return {};
     }
     if( !saved && saved.error() != std::errc::no_such_file_or_directory ) {
@@ -82,7 +88,7 @@ fw::Result<> Identity::init()
     } while( !is_usable( generated ) );
 
     id_ = generated;
-    LOG_INF( "generated device ID %s", format_device_id( id_ ).data() );
+    log_id( "generated device ID", id_ );
     if( auto ret = fw::settings::save( id_key, generated ); !ret ) {
         LOG_ERR( "device ID not saved, a new one will be generated at the next boot: %d", fw::err::to_zephyr( ret.error() ) );
         return ret;
@@ -103,7 +109,7 @@ fw::Result<> Identity::set_id( const DeviceId &id )
     if( auto ret = fw::settings::save( id_key, id ); !ret ) {
         return ret;
     }
-    LOG_INF( "device ID %s saved for the next boot", format_device_id( id ).data() );
+    log_id( "device ID saved for the next boot:", id );
     return {};
 }
 

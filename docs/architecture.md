@@ -152,7 +152,7 @@ Carried now: the LSM6DSL motion (wake-up) trigger, used to sleep when idle and w
 
 ## Build variants
 
-An app's default build is its **release** build. `debug.conf` (added with `-DEXTRA_CONF_FILE=debug.conf`) makes the **debug** build: it enables Zephyr's shell with the app's debug commands (`app_main/src/debug_shell/`, e.g. overwriting the device ID) and asserts. Debug-only code depends on `CONFIG_SHELL`, so it cannot reach a release build; CI builds both and fails if a release build enables the shell. clang-tidy analyzes the debug build, which contains everything the release build does.
+An app's default build is its **release** build. `debug.conf` (added with `-DEXTRA_CONF_FILE=debug.conf`) makes the **debug** build: it enables Zephyr's shell with the app's debug commands (`app_main/src/debug_shell/`, e.g. overwriting the device ID) and asserts, and logs the reset cause at boot. Debug-only code depends on `CONFIG_SHELL`, so it cannot reach a release build; CI builds both and fails if a release build enables the shell. clang-tidy analyzes the debug build, which contains everything the release build does.
 
 Shell commands run in the shell thread, so they only call services' thread-safe operations (documented on each), not the single-threaded ones a manager owns.
 

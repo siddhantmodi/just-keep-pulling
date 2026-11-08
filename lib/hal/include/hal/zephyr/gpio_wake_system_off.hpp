@@ -16,6 +16,7 @@
 #pragma once
 
 #include <zephyr/drivers/gpio.h>
+#include <zephyr/logging/log_ctrl.h>
 #include <zephyr/sys/poweroff.h>
 
 #include <expected>
@@ -51,6 +52,8 @@ public:
         if( auto ret = fw::err::check( gpio_pin_interrupt_configure_dt( &wake_, GPIO_INT_LEVEL_ACTIVE ) ); !ret ) {
             return ret;
         }
+        // Pending log messages would be lost with the power.
+        LOG_PANIC();
         sys_poweroff();
 #else
         return std::unexpected( std::errc::not_supported );

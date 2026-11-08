@@ -105,8 +105,8 @@ SHELL_STATIC_SUBCMD_SET_CREATE( jkp_id_cmds, SHELL_CMD_ARG( set, NULL, "Set the 
                                 SHELL_SUBCMD_SET_END );
 SHELL_STATIC_SUBCMD_SET_CREATE( jkp_rate_cmds, SHELL_CMD_ARG( set, NULL, "Set the sample rate: jkp rate set <SPS>", cmd_rate_set, 2, 0 ),
                                 SHELL_SUBCMD_SET_END );
-SHELL_STATIC_SUBCMD_SET_CREATE( jkp_cmds, SHELL_CMD( id, &jkp_id_cmds, "Show the device ID", cmd_id ),
-                                SHELL_CMD( rate, &jkp_rate_cmds, "Show the sample rate", cmd_rate ),
+SHELL_STATIC_SUBCMD_SET_CREATE( jkp_cmds, SHELL_CMD( id, &jkp_id_cmds, "Show the device ID; jkp id set <12 hex digits> sets it", cmd_id ),
+                                SHELL_CMD( rate, &jkp_rate_cmds, "Show the sample rate; jkp rate set <SPS> sets it", cmd_rate ),
                                 SHELL_CMD( battery, NULL, "Show the latest battery reading (every 30 s)", cmd_battery ), SHELL_SUBCMD_SET_END );
 SHELL_CMD_REGISTER( jkp, &jkp_cmds, "Dynamometer debug commands", NULL );
 // NOLINTEND(modernize-avoid-c-arrays,modernize-use-nullptr,performance-no-int-to-ptr)

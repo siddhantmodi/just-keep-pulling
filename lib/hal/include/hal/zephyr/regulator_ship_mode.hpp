@@ -17,6 +17,7 @@
 
 #include <zephyr/device.h>
 #include <zephyr/drivers/regulator.h>
+#include <zephyr/logging/log_ctrl.h>
 
 #include <expected>
 #include <fw/error.hpp>
@@ -44,6 +45,8 @@ public:
 
     [[nodiscard]] fw::Result<> power_off() override
     {
+        // Pending log messages would be lost with the power.
+        LOG_PANIC();
         return fw::err::check( regulator_parent_ship_mode( regulators_ ) );
     }
 

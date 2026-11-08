@@ -16,15 +16,58 @@
 
 #include <zephyr/app_version.h>
 #include <zephyr/logging/log.h>
+#if defined( CONFIG_HWINFO )
+#include <zephyr/drivers/hwinfo.h>
+#endif
 
+#include <array>
 #include <cmath>
+#include <cstdint>
 #include <fw/settings.hpp>
 
 LOG_MODULE_REGISTER( app_main, CONFIG_APP_MAIN_LOG_LEVEL );
 
+#if defined( CONFIG_HWINFO )
+namespace
+{
+
+/** @brief Debug builds: why the chip reset, cleared so the next boot shows only its own. */
+void log_reset_cause()
+{
+    std::uint32_t cause = 0;
+    if( hwinfo_get_reset_cause( &cause ) != 0 ) {
+        return;
+    }
+    struct Name {
+        std::uint32_t bit;
+        const char *name;
+    };
+    constexpr std::array names{ Name{ .bit = RESET_POR, .name = "power-on" },
+                                Name{ .bit = RESET_PIN, .name = "reset pin" },
+                                Name{ .bit = RESET_SOFTWARE, .name = "software" },
+                                Name{ .bit = RESET_BROWNOUT, .name = "brownout" },
+                                Name{ .bit = RESET_WATCHDOG, .name = "watchdog" },
+                                Name{ .bit = RESET_DEBUG, .name = "debugger" },
+                                Name{ .bit = RESET_LOW_POWER_WAKE, .name = "wake from System OFF" },
+                                Name{ .bit = RESET_CPU_LOCKUP, .name = "CPU lockup" } };
+    LOG_INF( "reset cause 0x%08x", cause );
+    for( auto const &[bit, name] : names ) {
+        if( ( cause & bit ) != 0U ) {
+            LOG_INF( "reset cause: %s", name );
+        }
+    }
+    (void)hwinfo_clear_reset_cause();
+}
+
+} // namespace
+#endif
+
 int main()
 {
     LOG_INF( "app_main v%s", APP_VERSION_STRING );
+#if defined( CONFIG_HWINFO )
+    log_reset_cause();
+#endif
 
     if( auto ret = fw::settings::init(); !ret ) {
         LOG_ERR( "settings init failed: %d", fw::err::to_zephyr( ret.error() ) );
