@@ -1,83 +1,75 @@
 /**
  * @file test_led.cpp
- * @brief Unit tests of led_svc::Led against three mocked digital outputs.
+ * @brief led_svc::Led on Zephyr's GPIO LED driver, against native_sim's emulated GPIOs.
  *
  * SPDX-License-Identifier: Apache-2.0
  */
 
 #include "led.hpp"
 
-#include <expected>
-#include <gmock/gmock.h>
+#include <zephyr/drivers/gpio.h>
+#include <zephyr/drivers/gpio/gpio_emul.h>
+#include <zephyr/drivers/led.h>
+
 #include <gtest/gtest.h>
-#include <hal/mocks/mock_digital_output.hpp>
-#include <system_error>
 
 namespace
 {
 
 using led_svc::Color;
-using testing::Return;
+
+/** @brief Whether the LED on @p pin is lit: they are active low. */
+bool lit( gpio_pin_t pin )
+{
+    return gpio_emul_output_get( DEVICE_DT_GET( DT_NODELABEL( gpio0 ) ), pin ) == 0;
+}
 
 class LedTest : public testing::Test
 {
 protected:
-    void expect( bool red, bool green, bool blue )
+    void SetUp() override
     {
-        EXPECT_CALL( red_, set( red ) ).WillOnce( Return( fw::Result<>{} ) );
-        EXPECT_CALL( green_, set( green ) ).WillOnce( Return( fw::Result<>{} ) );
-        EXPECT_CALL( blue_, set( blue ) ).WillOnce( Return( fw::Result<>{} ) );
+        ASSERT_TRUE( led_.init() );
     }
 
-    testing::StrictMock<hal::mocks::MockDigitalOutput> red_;
-    testing::StrictMock<hal::mocks::MockDigitalOutput> green_;
-    testing::StrictMock<hal::mocks::MockDigitalOutput> blue_;
-    led_svc::Led led_{ red_, green_, blue_ };
+    static void expect_lit( bool red, bool green, bool blue )
+    {
+        EXPECT_EQ( lit( 0 ), red );
+        EXPECT_EQ( lit( 1 ), green );
+        EXPECT_EQ( lit( 2 ), blue );
+    }
+
+    led_svc::Led led_{ LED_DT_SPEC_GET( DT_ALIAS( status_led_red ) ), LED_DT_SPEC_GET( DT_ALIAS( status_led_green ) ),
+                       LED_DT_SPEC_GET( DT_ALIAS( status_led_blue ) ) };
 };
 
-TEST_F( LedTest, InitConfiguresAllThreeOff )
+TEST_F( LedTest, InitTurnsAllOff )
 {
-    EXPECT_CALL( red_, init( false ) ).WillOnce( Return( fw::Result<>{} ) );
-    EXPECT_CALL( green_, init( false ) ).WillOnce( Return( fw::Result<>{} ) );
-    EXPECT_CALL( blue_, init( false ) ).WillOnce( Return( fw::Result<>{} ) );
-
-    EXPECT_TRUE( led_.init() );
+    ASSERT_TRUE( led_.show( Color::red ) );
+    ASSERT_TRUE( led_.init() );
+    expect_lit( false, false, false );
     EXPECT_EQ( led_.color(), Color::off );
-}
-
-TEST_F( LedTest, InitFailsWhenAPinIsNotReady )
-{
-    EXPECT_CALL( red_, init( false ) ).WillOnce( Return( std::unexpected( std::errc::no_such_device ) ) );
-    EXPECT_EQ( led_.init(), std::unexpected( std::errc::no_such_device ) );
 }
 
 TEST_F( LedTest, ShowsOneColorAtATime )
 {
-    expect( false, true, false );
     ASSERT_TRUE( led_.show( Color::green ) );
+    expect_lit( false, true, false );
     EXPECT_EQ( led_.color(), Color::green );
 
-    expect( false, false, true );
     ASSERT_TRUE( led_.show( Color::blue ) );
+    expect_lit( false, false, true );
 
-    expect( true, false, false );
     ASSERT_TRUE( led_.show( Color::red ) );
+    expect_lit( true, false, false );
 }
 
 TEST_F( LedTest, OffTurnsAllOff )
 {
-    expect( false, false, false );
+    ASSERT_TRUE( led_.show( Color::blue ) );
     ASSERT_TRUE( led_.show( Color::off ) );
+    expect_lit( false, false, false );
     EXPECT_EQ( led_.color(), Color::off );
-}
-
-TEST_F( LedTest, SetsEveryPinEvenAfterAFailure )
-{
-    EXPECT_CALL( red_, set( false ) ).WillOnce( Return( std::unexpected( std::errc::io_error ) ) );
-    EXPECT_CALL( green_, set( true ) ).WillOnce( Return( fw::Result<>{} ) );
-    EXPECT_CALL( blue_, set( false ) ).WillOnce( Return( fw::Result<>{} ) );
-
-    EXPECT_EQ( led_.show( Color::green ), std::unexpected( std::errc::io_error ) );
 }
 
 } // namespace

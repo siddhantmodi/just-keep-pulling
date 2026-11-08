@@ -7,7 +7,7 @@ project(test_led_svc)
 
 target_compile_options(app PRIVATE -Werror)
 
-# The Led class with three mocked outputs (lib/hal's MockDigitalOutput).
+# The Led class on Zephyr's GPIO LED driver, over native_sim's emulated GPIOs.
 target_include_directories(app PRIVATE ../inc ../src)
 
 target_sources(app PRIVATE

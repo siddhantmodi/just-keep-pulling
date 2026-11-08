@@ -1,6 +1,6 @@
 /**
  * @file led.hpp
- * @brief led_svc::Led: an RGB LED over three injected hal::IDigitalOutputs, one color at a time.
+ * @brief led_svc::Led: an RGB LED as three Zephyr LEDs, one color at a time.
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -9,8 +9,9 @@
 
 #include "led_svc.hpp"
 
+#include <zephyr/drivers/led.h>
+
 #include <fw/error.hpp>
-#include <hal/digital_output.hpp>
 
 namespace led_svc
 {
@@ -18,7 +19,7 @@ namespace led_svc
 class Led final : public ILed
 {
 public:
-    constexpr Led( hal::IDigitalOutput &red, hal::IDigitalOutput &green, hal::IDigitalOutput &blue ) noexcept
+    constexpr Led( const led_dt_spec &red, const led_dt_spec &green, const led_dt_spec &blue ) noexcept
         : red_{ red }
         , green_{ green }
         , blue_{ blue }
@@ -30,9 +31,9 @@ public:
     [[nodiscard]] Color color() const override;
 
 private:
-    hal::IDigitalOutput &red_;
-    hal::IDigitalOutput &green_;
-    hal::IDigitalOutput &blue_;
+    led_dt_spec red_;
+    led_dt_spec green_;
+    led_dt_spec blue_;
     Color color_{ Color::off };
 };
 

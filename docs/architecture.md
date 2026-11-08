@@ -28,7 +28,7 @@ If yes, use it directly. A seam (an injected, mockable dependency) is only neede
 1. **Wrap only to remove a recurring C-ism**: `CONTAINER_OF` callback trampolines, manual lock/unlock, `k_timeout_t` instead of `std::chrono`, negative-errno ints instead of `fw::Result`. A wrapper that only renames a Zephyr function is not added; call Zephyr directly.
 2. **Components depend on interfaces, so every layer can be unit tested against mocks of the layer below.** Hardware capabilities are interfaces in `lib/hal`; a service's interface is in its public header. Kernel objects, zbus and settings are not mocked: they run for real in tests (the table above).
 3. **Logic doesn't own threads.** A component's logic is a synchronous object. Inputs arrive as method calls (a zbus message, a "timeout fired" event); outputs are publishes or HAL calls. The thread, work item or callback that drives it is plumbing. Tests call the methods directly: no sleeps, no thread synchronization.
-4. **Seams are lean virtual interfaces.** An interface has pure virtual methods and a protected, non-virtual destructor (nothing is deleted through it); implementations are `final`. Objects are static and passed by reference: no `shared_ptr`, factories, heap or `std::function`. Hardware interfaces describe a capability (`hal::IDigitalOutput`, `hal::IBatteryCharger`, a voltage in mV), never *which* instance or *what it is for*: one `MockDigitalOutput` serves an LED, a buzzer and an enable line, and Zephyr types such as `sensor_channel` stay in the implementation. Concept-constrained templates are reserved for proven hot paths (e.g. per-sample code at interrupt rate).
+4. **Seams are lean virtual interfaces.** An interface has pure virtual methods and a protected, non-virtual destructor (nothing is deleted through it); implementations are `final`. Objects are static and passed by reference: no `shared_ptr`, factories, heap or `std::function`. Hardware interfaces describe a capability (`hal::IBatteryCharger`, `hal::IMotionSensor`, a voltage in mV), never *which* instance or *what it is for*: one mock serves every instance, and Zephyr types such as `sensor_channel` stay in the implementation. Concept-constrained templates are reserved for proven hot paths (e.g. per-sample code at interrupt rate).
 5. **Large stacks are split, not wrapped.** BLE/networking code is a thin adapter (GATT table, callbacks, advertising) over pure logic (encoding, validation, state machines). The logic is unit tested; the adapter is covered by integration tests (Bumble).
 
 ## Integration tests
@@ -59,14 +59,13 @@ In `lib/hal`, **the folder is the role and the file is named after the one type 
 
 | Header | Type |
 |---|---|
-| `<hal/digital_output.hpp>` | `hal::IDigitalOutput` (interface) |
-| `<hal/zephyr/gpio_output.hpp>` | `hal::zephyr::GpioOutput` |
-| `<hal/mocks/mock_digital_output.hpp>` | `hal::mocks::MockDigitalOutput` |
+| `<hal/battery_charger.hpp>` | `hal::IBatteryCharger` (interface) |
+| `<hal/zephyr/npm13xx_charger.hpp>` | `hal::zephyr::Npm13xxCharger` |
+| `<hal/mocks/mock_battery_charger.hpp>` | `hal::mocks::MockBatteryCharger` |
 
 - **Interfaces are named for the capability** (`I` prefix; the file drops it). Implementations are named for the Zephyr API behind them.
-- **Input and output stay separate types**, even though both are built from a `gpio_dt_spec`. A pin that must be both (open-drain, 1-wire) gets its own type implementing both interfaces.
 - **`scripts/check_layering.sh` enforces the Zephyr boundary.** It runs in CI and fails if an interface header includes Zephyr (it also checks the app layering below).
-- **Pin direction is chosen where the app creates the object.** A `gpio_dt_spec` carries no direction, so `GpioOutput` configures whatever pin it is given as an output. Nothing in Zephyr or the HAL can catch a button pin passed to an output. Review the `GPIO_DT_SPEC_GET( ... )` line: the devicetree alias (`led0`, `sw0`) is where the intent is visible.
+- **Pin direction is chosen where the app creates the object.** A `gpio_dt_spec` carries no direction, so a HAL type configures whatever pin it is given (`GpioWakeSystemOff` makes it an input). Review the `GPIO_DT_SPEC_GET( ... )` line: the devicetree alias is where the intent is visible.
 
 Within an app, components follow the layering proven in cho03, one folder per layer under `app_<name>/src/`:
 
@@ -185,7 +184,7 @@ The testability comes from the rules above, not from the language. The same laye
   - `CONFIG_REQUIRES_FULL_LIBCPP` links the full C++ library, and careless template use duplicates code.
   - Some standard-library features allocate or throw and must not be used: `std::function`, `std::string`, `std::vector`, `shared_ptr`, iostreams. With exceptions off, a throwing path aborts, and the throwing paths drag in the exception runtime: in a past project (v5 gripper), heap ownership, `std::function` and that runtime cost ~23 KB, against ~2 KB for the vtables themselves.
   - Virtual calls cannot be inlined, and every method of a used class is linked in, called or not. Moving from concept templates to interfaces here cost +392 B flash and +24 B RAM on the nRF54L15 (68 B of vtables; the rest is calls that are no longer inlined).
-  - Small costs creep in. For example, a non-const object holding a devicetree spec lives in RAM where a `const` C struct would sit in flash: `hal::zephyr::GpioOutput` costs 8 B of RAM.
+  - Small costs creep in. For example, a non-const object holding a devicetree spec lives in RAM where a `const` C struct would sit in flash: `led_svc::Led`'s three `led_dt_spec`s cost 24 B of RAM.
 - **A dialect to enforce.** C++23 with no exceptions, no RTTI, no heap in production paths, and `constinit` globals. clang-tidy enforces part of this; review covers the rest.
 - **Toolchain coupling.** `std::expected` and other C++23 features depend on the Zephyr SDK's standard library version.
 - **People.** Embedded engineers are, on average, more fluent in C. Interfaces at every layer are familiar to most C++ engineers; template-heavy code would be harder to review and debug.

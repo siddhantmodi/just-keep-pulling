@@ -2,9 +2,9 @@
 
 config APP_LED_SVC
 	bool "LED service"
-	depends on GPIO
+	depends on LED
 	help
-	  The RGB status LED, as three GPIO-driven LEDs.
+	  The RGB status LED, as three Zephyr LEDs (e.g. gpio-leds).
 
 # Outside "if APP_LED_SVC" so the unit test gets the log level too.
 module = APP_LED_SVC

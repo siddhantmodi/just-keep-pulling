@@ -187,7 +187,7 @@ classDiagram
             +color() Color
         }
         class Led {
-            three IDigitalOutput, one color at a time
+            three Zephyr LEDs (gpio-leds), one color at a time
         }
     }
 
@@ -442,7 +442,7 @@ Each component's production file binds the concrete types (see `docs/architectur
 | `measurement_manager::start()` | `Measurement` in `measurement_manager.cpp`, built on first use | `load_cell()`, `client()`, and the device ID as at boot; thread priority 2. Started only if the load cell did |
 | `power_manager::start( pmic_ready )` | `Power`, `Activity` and `Indicator` in `power_manager.cpp`, built on first use | `pmic()` (battery checks only if the PMIC started), `motion()`, `led()`, `client()`; idle timeouts from Kconfig; thread priority 7 |
 | `motion_svc::motion()` | `Motion` on `hal::zephyr::SensorMotion` and `GpioWakeSystemOff` | devicetree alias `motion-sensor`: the XIAO's LSM6DS3TR-C (Zephyr's LSM6DSL driver, patched; deferred init after the PMIC's LDO1), its INT1 (P0.06) waking the SoC; or the emulated chip on native_sim |
-| `led_svc::led()` | `Led` on three `hal::zephyr::GpioOutput`s | devicetree aliases `status-led-red`, `-green`, `-blue`: the XIAO's RGB LED (active low; red P1.22, green P1.24, blue P1.23, as Seeed's current board files), or emulated GPIOs on native_sim |
+| `led_svc::led()` | `Led` on three Zephyr LEDs (`led_dt_spec`, gpio-leds) | devicetree aliases `status-led-red`, `-green`, `-blue`: the XIAO's RGB LED (active low; red P1.22, green P1.24, blue P1.23, as Seeed's current board files), or emulated GPIOs on native_sim |
 | `pmic_svc::pmic()` | `Pmic` on `hal::zephyr::Npm13xxCharger` and `RegulatorShipMode` | devicetree aliases `pmic-charger` and `pmic-regulators`: the XIAO's nPM1300 (bit-banged I2C on P1.18/P1.17), or the emulated chip on native_sim |
 | `ble_svc::client()` | `Client` in `ble_svc.cpp`; the GATT services in `tindeq_service.cpp`, `jkp_service.cpp` and `battery_service.cpp` | Bluetooth: advertising as `Progressor_NNNN` (NNNN from the device ID), the Tindeq Progressor, JustKeepPulling (reads `identity()` and `load_cell()`'s sample rate), Device Information and Battery services |
 | `load_cell_svc::load_cell()` | `LoadCell` on `hal::zephyr::Ads1220` | devicetree alias `load-cell-adc`: the ADS1220 on the XIAO's SPI (`/CS` P1.00, `/DRDY` P1.31), or the emulated chip on native_sim |
