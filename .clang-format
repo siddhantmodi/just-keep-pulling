@@ -1,4 +1,4 @@
-# Formatting for this repo's C/C++ sources (app_main/, lib/). Dependencies under
+# Formatting for this repo's C/C++ sources (app_*/, lib/). Dependencies under
 # deps/ keep their own .clang-format. Check with scripts/check_format.sh.
 
 BasedOnStyle: LLVM

@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: Apache-2.0
+
+config APP_PMIC_SVC
+	bool "PMIC service"
+	depends on SENSOR && REGULATOR
+	help
+	  The nPM1300 PMIC: battery voltage and charger state, and ship mode
+	  (everything off until USB power or a power cycle).
+
+# Outside "if APP_PMIC_SVC" so the unit test gets the log level too.
+module = APP_PMIC_SVC
+module-str = pmic_svc
+source "subsys/logging/Kconfig.template.log_config"

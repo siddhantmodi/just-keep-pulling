@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: Apache-2.0
+
+config APP_LOAD_CELL_SVC
+	bool "Load-cell service"
+	depends on JKP_ADS1220 && FW_HAL && SETTINGS
+	depends on $(dt_alias_enabled,load-cell-adc)
+	help
+	  Samples the load cell at the board's load-cell-adc alias and converts
+	  readings to kg (tare, calibration factor saved in settings).
+
+# Outside "if APP_LOAD_CELL_SVC" so the unit test (which builds the LoadCell
+# class without the production instance) gets the log level too.
+module = APP_LOAD_CELL_SVC
+module-str = load_cell_svc
+source "subsys/logging/Kconfig.template.log_config"

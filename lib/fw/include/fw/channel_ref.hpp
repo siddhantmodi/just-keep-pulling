@@ -11,6 +11,11 @@
  * inline constexpr fw::ChannelRef<LedRequest> led_request{ led_request_chan };
  * @endcode
  *
+ * zbus locks the channel for every publish and read, so a call can find it
+ * busy for the few microseconds another thread holds it. Every call states how
+ * long to wait, with no default: K_NO_WAIT in ISRs and listeners, a short wait
+ * in threads.
+ *
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -42,15 +47,22 @@ public:
     {
     }
 
-    /** @brief Publish @p msg, notifying observers. Fails with e.g. resource_unavailable_try_again on lock timeout. */
-    [[nodiscard]] Result<> publish( const T &msg, k_timeout_t timeout = K_NO_WAIT ) const noexcept
+    /**
+     * @brief Publish @p msg, notifying observers. Fails with device_or_resource_busy
+     *        if the channel is busy and @p timeout is K_NO_WAIT,
+     *        resource_unavailable_try_again if it stays busy for @p timeout.
+     */
+    [[nodiscard]] Result<> publish( const T &msg, k_timeout_t timeout ) const noexcept
     {
         __ASSERT( zbus_chan_msg_size( chan_ ) == sizeof( T ), "channel message size does not match T" );
         return err::check( zbus_chan_pub( chan_, &msg, timeout ) );
     }
 
-    /** @brief Copy the channel's current message. Thread-safe; must not be called from a listener on this channel. */
-    [[nodiscard]] Result<T> read( k_timeout_t timeout = K_NO_WAIT ) const noexcept
+    /**
+     * @brief Copy the channel's current message; fails as publish() when busy.
+     *        Must not be called from a listener on this channel (see const_msg()).
+     */
+    [[nodiscard]] Result<T> read( k_timeout_t timeout ) const noexcept
     {
         __ASSERT( zbus_chan_msg_size( chan_ ) == sizeof( T ), "channel message size does not match T" );
         T msg{};

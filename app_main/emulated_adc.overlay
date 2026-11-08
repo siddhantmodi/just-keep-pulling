@@ -1,0 +1,33 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+
+/* The ADS1220 emulator in place of the ADC; use with emulated_adc.conf. */
+
+/delete-node/ &load_cell_adc;
+
+/ {
+	emul_spi: spi@ffff0000 {
+		compatible = "zephyr,spi-emul-controller";
+		reg = <0xffff0000 4>;
+		clock-frequency = <2000000>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		load_cell_adc: ads1220@0 {
+			compatible = "jkp,ads1220";
+			reg = <0>;
+			spi-max-frequency = <2000000>;
+			drdy-gpios = <&emul_gpio 0 GPIO_ACTIVE_LOW>;
+			low-side-power-switch;
+		};
+	};
+
+	emul_gpio: gpio-emul {
+		compatible = "zephyr,gpio-emul";
+		rising-edge;
+		falling-edge;
+		high-level;
+		low-level;
+		gpio-controller;
+		#gpio-cells = <2>;
+	};
+};

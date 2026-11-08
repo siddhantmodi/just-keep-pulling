@@ -42,6 +42,8 @@
 build/
 Build/
 build-*/
+# The nRF Connect VS Code extension names its build folders build_<name>.
+build_*/
 
 # CMake generated files
 CMakeFiles/
@@ -76,3 +78,6 @@ artifacts/
 .venv/
 __pycache__/
 *.egg-info/
+
+# native_sim simulated flash, written to the working directory when an app runs
+flash.bin

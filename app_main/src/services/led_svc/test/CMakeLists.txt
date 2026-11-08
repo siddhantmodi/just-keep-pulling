@@ -7,8 +7,7 @@ project(test_led_svc)
 
 target_compile_options(app PRIVATE -Werror)
 
-# The Led class only; the production instance (led_svc.cpp) is not built, so
-# no GPIO driver is involved. The HAL mocks come from lib/hal.
+# The Led class on Zephyr's GPIO LED driver, over native_sim's emulated GPIOs.
 target_include_directories(app PRIVATE ../inc ../src)
 
 target_sources(app PRIVATE

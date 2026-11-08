@@ -61,7 +61,7 @@ namespace
 
 TEST( ChannelRefTest, ReadReturnsInitialMessage )
 {
-    auto msg = untouched.read();
+    auto msg = untouched.read( K_NO_WAIT );
 
     ASSERT_TRUE( msg );
     EXPECT_EQ( msg->value, 7 );
@@ -70,9 +70,9 @@ TEST( ChannelRefTest, ReadReturnsInitialMessage )
 
 TEST( ChannelRefTest, PublishThenReadRoundTrips )
 {
-    ASSERT_TRUE( sample.publish( { .value = -42, .flag = true } ) );
+    ASSERT_TRUE( sample.publish( { .value = -42, .flag = true }, K_NO_WAIT ) );
 
-    auto msg = sample.read();
+    auto msg = sample.read( K_NO_WAIT );
 
     ASSERT_TRUE( msg );
     EXPECT_EQ( msg->value, -42 );
@@ -93,7 +93,7 @@ namespace
 
 TEST( ChannelRefTest, ListenerSeesPublishedMessageViaConstMsg )
 {
-    ASSERT_TRUE( listened.publish( { .value = 99, .flag = true } ) );
+    ASSERT_TRUE( listened.publish( { .value = 99, .flag = true }, K_NO_WAIT ) );
 
     EXPECT_EQ( seen_by_listener.value, 99 );
     EXPECT_TRUE( seen_by_listener.flag );

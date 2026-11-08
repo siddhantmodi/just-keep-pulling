@@ -1,0 +1,39 @@
+# SPDX-License-Identifier: Apache-2.0
+
+description: |
+  TI ADS1220 24-bit ADC wired as a ratiometric load-cell (bridge) front end:
+  the reference is REFP0/REFN0 across the bridge excitation. Driven by this
+  repo's driver (<jkp/drivers/ads1220.h>), which runs continuous conversions at
+  a rate chosen at runtime and reads each sample on the data-ready signal.
+  Zephyr's own ti,ads1220 ADC driver only does single-shot conversions at a
+  devicetree-fixed rate.
+
+compatible: "jkp,ads1220"
+
+include: spi-device.yaml
+
+properties:
+  drdy-gpios:
+    type: phandle-array
+    required: true
+    description: The dedicated /DRDY pin (active low).
+
+  mux:
+    type: int
+    default: 3
+    description: |
+      Input multiplexer, the MUX field of register 0. 3 (default) measures
+      AIN1 (positive) against AIN2 (negative).
+
+  gain:
+    type: int
+    default: 128
+    enum: [1, 2, 4, 8, 16, 32, 64, 128]
+    description: PGA gain.
+
+  low-side-power-switch:
+    type: boolean
+    description: |
+      Close the low-side power switch (AIN3/REFN1 to AVSS) while converting,
+      so a bridge returned through AIN3/REFN1 draws no current while the ADC is
+      powered down.

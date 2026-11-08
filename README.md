@@ -2,43 +2,78 @@
 
 Zephyr RTOS based firmware for a dynamometer for measuring finger strength for rock climbers. Based on the open-source Crimpdeq.
 
-Built on the nRF Connect SDK (NCS) for the nRF54L15 DK, in C++23, with GoogleTest unit tests and Bumble BLE integration tests that run on `native_sim`.
+Built on the nRF Connect SDK (NCS) for the Seeed XIAO nRF54LM20A, in C++23, with GoogleTest unit tests and Bumble BLE integration tests that run on `native_sim`.
 
-The template app, `app_main`, exposes a custom BLE GATT service (advertised as "Just Keep Pulling"): an LED characteristic (read/write, `uint8` 0/1) and the die temperature (read, `int16` little-endian, hundredths of a degree Celsius). The service is open: no pairing is required. See `app_main/src/services/ble_svc/inc/ble_svc.hpp` for the UUIDs.
+The firmware is `app_main`: a finger-strength dynamometer for the Seeed XIAO nRF54LM20A with an ADS1220 load-cell ADC, compatible with the Tindeq Progressor app (Bluetooth protocol as implemented by [Crimpdeq](https://github.com/crimpdeq)). It advertises as `Progressor_NNNN` and answers the Progressor commands: tare, start/stop measurement (streaming timestamped samples), app version, Progressor ID, battery voltage (from the nPM1300 PMIC) and shutdown. Calibration, the sample rate and the full device ID are on our own JustKeepPulling service (below), beside the standard Device Information and Battery services. On a low battery it sends the Progressor low-power warning and puts the PMIC in ship mode. After 4 minutes idle (10 with the app connected, even while measuring if nobody pulls) it sleeps until it is moved (IMU wake-on-motion). The status LED shows blue while waiting for the app, green when connected and blinking red on a low battery (10 % or less), as Crimpdeq's. The battery level comes from Nordic's nRF Fuel Gauge on the nPM1300's readings; the power-off stays on the voltage (3.3 V). OTA updates are still to come; see `docs/architecture.md` for the patterns it follows and `docs/app_main.md` for how its parts connect.
+
+## Bluetooth services
+
+| Service | UUID | For |
+|---|---|---|
+| Tindeq Progressor | `7e4e1701-1ea6-40c9-9dcc-13d34ffead57` | The Tindeq app: tare, measurements, battery voltage, ID, version |
+| JustKeepPulling | `a6bd0001-a614-4d5e-b412-e86a44627954` | Calibration, sample rate, device ID: any GATT client (e.g. nRF Connect) |
+| Device Information, Battery | standard | Firmware version and battery level in generic apps |
+
+JustKeepPulling characteristics (values little-endian; each has a user description, which nRF Connect shows as its name):
+
+| UUID | Name | Access | Value |
+|---|---|---|---|
+| `a6bd0002-…` | Calibration | read, notify | status `u8` (0 ok, 1 measuring, 2 full, 3 fit rejected, 4 failed), points `u8`, factor `f32` (g per ADC code) |
+| `a6bd0003-…` | Add calibration point (kg) | write | the load in kg, `f32` (≥ 0) |
+| `a6bd0004-…` | Reset calibration | write | `01` |
+| `a6bd0005-…` | Sample rate (SPS) | read, write | `u16`: 20, 45, 90, 175, 330, 600 or 1000; used from the next measurement, saved |
+| `a6bd0006-…` | Device ID | read | 6 bytes, as displayed (the Progressor ID sends them reversed) |
+
+A malformed write gets an ATT error: Invalid Attribute Value Length for a wrong size, Value Not Allowed for a bad value.
+
+### Calibrating with nRF Connect
+
+1. Connect to `Progressor_NNNN`, open the JustKeepPulling service and enable notifications on **Calibration**.
+2. Optionally start over: write `01` to **Reset calibration** (back to the default factor; the saved one is erased).
+3. With nothing on the load cell, write `00 00 00 00` (0 kg) to **Add calibration point (kg)**. Calibration notifies `01` (measuring, about 1.25 s, keep it still), then `00` with one point.
+4. Hang a known load and write its weight as a little-endian float: 5 kg `00 00 A0 40`, 10 kg `00 00 20 41`, 20 kg `00 00 A0 41` (any other: `struct.pack("<f", kg).hex()` in Python). From the second different load on, the factor is refitted and saved; a repeated weight (e.g. 0 kg twice) is just kept.
+5. Add more loads for a better fit (up to 20 points; status `02` means full, reset to start over). Status `03` means the points gave an implausible factor: they were cleared and the previous factor kept.
+
+Points are kept in RAM until a reboot or reset, as in Crimpdeq; the factor survives reboots.
 
 ## Repository layout
 
 ```
 west.yml              West manifest: sdk-nrf (allowlisted) and googletest, fetched into ../deps
-west_setup.sh         Initialize/update the west workspace (run by the devcontainer and CI)
+west_setup.sh         Initialize/update the west workspace and apply zephyr/patches.yml (run by the devcontainer and CI)
 zephyr/module.yml     This repo is a Zephyr module, so lib/, drivers/ and dts/ are available to every app and test
+zephyr/patches.yml    Upstreamable patches to dependencies (zephyr/patches/), applied by west_setup.sh (west patch)
 lib/
-  fw/                 Header-only C++ helpers: fw::Result, fw::ChannelRef (zbus), fw::QueueRef (k_msgq), fw::ScopedLock
+  fw/                 Header-only C++ helpers: fw::Result, fw::ChannelRef (zbus), fw::QueueRef (k_msgq), fw::ScopedLock, fw::settings
   hal/                Hardware capability interfaces (<hal/...>), Zephyr implementations (<hal/zephyr/...>), GoogleMocks (<hal/mocks/...>)
   gtest/              GoogleTest/GoogleMock as a Zephyr library (CONFIG_GTEST), test-only
-drivers/              Repo-owned Zephyr drivers (emulated temperature sensor for native_sim)
+drivers/              Repo-owned Zephyr drivers and emulators: ADS1220 load-cell ADC (+ chip emulator), nPM1300 PMIC emulator
 include/jkp/          Their headers; dts/bindings/ holds their devicetree bindings
 docs/architecture.md  Design rules, layers, why C++, and when to revisit them
-app_main/             The main firmware application
-  boards/             Devicetree overlays per board (aliases led0, die-temp)
+docs/app_main.md      app_main's class diagram (Mermaid): interfaces, implementations, modules, drivers
+app_main/             The dynamometer firmware (XIAO nRF54LM20A; native_sim for tests)
+  boards/             Devicetree overlays per board (aliases load-cell-adc, pmic-charger, pmic-regulators, motion-sensor, status-led-*: the real parts or emulated ones)
+  debug.conf          Debug build variant: adds logging and the shell
   src/main.cpp
   src/channels/       zbus channels: the message contracts shared by every layer
-  src/managers/       Own a thread and an event queue (app_manager)
-  src/services/       One subsystem or peripheral each (led_svc, temp_svc, ble_svc)
-  src/modules/        Pure logic, no Zephyr (none yet)
+  src/managers/       Own a thread and an event queue (measurement_manager, power_manager)
+  src/services/       One subsystem or peripheral each (identity_svc, load_cell_svc, ble_svc and its GATT services, pmic_svc, motion_svc, led_svc)
+  src/modules/        Pure logic, no Zephyr (calibration, progressor)
+  src/debug_shell/    "jkp" shell commands, debug builds only
+  src/emulated_load/  Emulated pulls on the user button, emulated-ADC builds only
     <component>/      Each component:
       inc/            Public API
       src/            Implementation
       mocks/          GoogleMock of its interface, for consumers' tests
       test/           GoogleTest unit test (its own small native_sim app)
-  integration/        pytest + Bumble tests of the whole app over BLE (app_main/testcase.yaml)
+  integration/        pytest + Bumble tests of the whole app over BLE, acting as the Tindeq app and as a generic GATT client (app_main/testcase.yaml)
 pylib/zephyr_bumble/  Reusable pytest plugin: Bumble virtual central for native_sim BLE apps
 requirements-test.txt Python dependencies of the integration tests (installed by west_setup.sh)
 scripts/              check_format.sh, check_layering.sh, run_clang_tidy.py
 .github/workflows/    CI
 ```
 
-Other applications (factory, calibration, samples) go in their own top-level `app_<name>/` directories.
+Other applications (factory, calibration, samples) go in their own top-level `app_<name>/` directories, with the same layout.
 
 The west workspace topdir is the **parent** of this repo; dependencies live in `../deps/`. In the devcontainer that is `/home/user/workspace`, with this repo at `/home/user/workspace/just-keep-pulling`.
 
@@ -46,9 +81,9 @@ The west workspace topdir is the **parent** of this repo; dependencies live in `
 
 - **Errors:** anything that can fail returns `fw::Result<T>` (`std::expected<T, std::errc>`). Zephyr return codes are converted with `fw::err::check()` / `fw::err::from_zephyr()`.
 - **C++:** C++23, no exceptions, no RTTI.
-- **Interfaces at every layer:** a component's public header holds an interface (`led_svc::ILed`) and an accessor to its production instance (`led_svc::led()`). Logic classes take interfaces in their constructors (hardware ones from `lib/hal`, e.g. `hal::IDigitalOutput`), so unit tests inject GoogleMocks; each component's production file binds the real hardware (`hal::zephyr::GpioOutput` on `led0`). See `app_main/src/services/led_svc/`.
+- **Interfaces at every layer:** a component's public header holds an interface (`load_cell_svc::ILoadCell`) and an accessor to its production instance (`load_cell_svc::load_cell()`). Logic classes take interfaces in their constructors (hardware ones from `lib/hal`, e.g. `hal::ILoadCellAdc`), so unit tests inject GoogleMocks; each component's production file binds the real hardware (`hal::zephyr::Ads1220` on `load-cell-adc`). See `app_main/src/services/load_cell_svc/`.
 - **Kernel, zbus, settings:** used for real in unit tests (the tests run on `native_sim`), wrapped only where it removes C boilerplate. See [docs/architecture.md](docs/architecture.md) for the rules.
-- **Managers and zbus:** a manager thread is the only caller of single-threaded services. zbus listeners copy messages into its event queue (see `app_main/src/managers/app_manager/` and [docs/architecture.md](docs/architecture.md)).
+- **Managers and zbus:** a manager thread is the only caller of single-threaded services. zbus listeners copy messages into its event queue (see `app_main/src/managers/measurement_manager/` and [docs/architecture.md](docs/architecture.md)).
 - **Unit tests:** GoogleTest, built for `native_sim` and run by Twister (`harness: gtest`). A test's `prj.conf` sets `CONFIG_GTEST=y`; tests are tagged `unit`.
 - **Integration tests:** the real app on `native_sim`, driven over BLE by a Bumble virtual central (`harness: pytest`, `pylib/zephyr_bumble`); tagged `integration`.
 
@@ -56,12 +91,30 @@ The west workspace topdir is the **parent** of this repo; dependencies live in `
 
 From the workspace topdir (`/home/user/workspace` in the devcontainer):
 
+On the XIAO, every build includes MCUboot, and `west flash` writes it and the signed app. Local builds are signed with MCUboot's public development key; CI signs pushes to `main` with ours (the `MCUBOOT_SIGNING_KEY` secret). A board accepts updates signed with the key its MCUboot was built with, so switching between local and CI images means flashing over the debug port.
+
+Updates over Bluetooth use the standard SMP service, e.g. from nRF Connect Device Manager with `dfu_application.zip` or `app_main/zephyr/zephyr.signed.bin`. A new image runs on trial: `main()` confirms it once Bluetooth is up, and if it fails before that, MCUboot goes back to the previous image at the next reset.
+
 ```sh
-west build -b nrf54l15dk/nrf54l15/cpuapp -d build/app_main just-keep-pulling/app_main
+# Release build (no logging, no shell)
+west build -b xiao_nrf54lm20a/nrf54lm20a/cpuapp -d build/app_main just-keep-pulling/app_main
 west flash -d build/app_main
+
+# Debug build: adds logging (with the reset cause at boot) and the shell on the console UART, with "jkp" commands:
+# id, rate, battery, and tare, measure <s> and calibrate <kg>|reset, which act as the app would and log the results
+west build -b xiao_nrf54lm20a/nrf54lm20a/cpuapp -d build/app_main-debug just-keep-pulling/app_main -- -DEXTRA_CONF_FILE=debug.conf
+
+# Debug build without the ADC fitted: the ADS1220 emulator stands in; holding the user button pulls 25 kg,
+# and the shell's "emul raw <code>" holds a fixed ADC code ("emul button" goes back)
+west build -b xiao_nrf54lm20a/nrf54lm20a/cpuapp -d build/app_main-emul just-keep-pulling/app_main -- \
+  -DEXTRA_CONF_FILE="debug.conf;emulated_adc.conf" -DEXTRA_DTC_OVERLAY_FILE=emulated_adc.overlay
+
+# Battery tests: logs every reading and never sleeps when idle; record with scripts/battery_log.py <port> <csv>
+west build -b xiao_nrf54lm20a/nrf54lm20a/cpuapp -d build/app_main-batlog just-keep-pulling/app_main -- \
+  -DEXTRA_CONF_FILE="debug.conf;battery_log.conf"
 ```
 
-`app_main` also builds and runs on `native_sim/native/64`.
+It also builds and runs on `native_sim/native/64`, with an emulated ADS1220.
 
 ## Testing and checks
 
@@ -71,7 +124,7 @@ Run these from this repo's directory; CI runs the same commands.
 # Unit tests (add --coverage --coverage-tool gcovr --enable-asan --enable-ubsan as CI does)
 west twister -T . -p native_sim/native/64 --tag unit --inline-logs
 
-# Integration tests: app_main on native_sim against a Bumble virtual BLE central
+# Integration tests: the app on native_sim against a Bumble virtual BLE central
 west twister -T . -p native_sim/native/64 --tag integration --inline-logs
 
 # Formatting (--fix to reformat in place)
@@ -80,7 +133,7 @@ scripts/check_format.sh
 # Include rules (HAL interface headers are Zephyr-free; managers -> services -> modules)
 scripts/check_layering.sh
 
-# clang-tidy: builds app_main for native_sim with clang, then analyzes production sources
+# clang-tidy: builds an app (default app_main; --app <app>) for native_sim with clang, then analyzes it
 scripts/run_clang_tidy.py
 ```
 
@@ -91,7 +144,7 @@ scripts/run_clang_tidy.py
 | Job | What it does |
 |---|---|
 | `format` | `scripts/check_format.sh` and `scripts/check_layering.sh` |
-| `unit` | Twister unit tests on `native_sim/native/64` with coverage, ASan and UBSan; uploads results and the coverage report |
+| `unit` | Twister unit tests on `native_sim/native/64` with coverage, ASan and UBSan, then the Zephyr tests that come with `zephyr/patches.yml`; uploads results and the coverage report |
 | `integration` | Twister integration tests (Bumble over BLE) on `native_sim/native/64` after `unit`; uploads results and app logs |
 | `tidy` | `scripts/run_clang_tidy.py` for each app |
-| `build` | Builds each app for its boards once the checks pass; uploads `.hex`/`.bin`/`.elf`, `.config` and checksums |
+| `build` | Builds each app for its boards once the checks pass (release, and debug for `app_main`; fails if a release build has the shell). Pushes to `main` are signed with the `MCUBOOT_SIGNING_KEY` secret (and fail if it is missing), pull requests with MCUboot's development key. Uploads MCUboot and the app merged into one `.hex` (for the debug port), the update (`-update.bin`, `-update.zip`), the `.elf`, `.config` and checksums |

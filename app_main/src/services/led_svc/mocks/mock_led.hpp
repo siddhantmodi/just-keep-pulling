@@ -1,6 +1,6 @@
 /**
  * @file mock_led.hpp
- * @brief led_svc::MockLed: GoogleMock of led_svc::ILed, for tests of components that use the LED.
+ * @brief led_svc::MockLed: GoogleMock of led_svc::ILed, for tests of its users.
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -19,8 +19,8 @@ class MockLed : public ILed
 {
 public:
     MOCK_METHOD( fw::Result<>, init, (), ( override ) );
-    MOCK_METHOD( fw::Result<>, set, ( bool on ), ( override ) );
-    MOCK_METHOD( bool, is_on, (), ( const, override ) );
+    MOCK_METHOD( fw::Result<>, show, ( Color color ), ( override ) );
+    MOCK_METHOD( Color, color, (), ( const, override ) );
 };
 
 } // namespace led_svc

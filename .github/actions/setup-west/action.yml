@@ -10,7 +10,7 @@ inputs:
   ccache-key:
     description: >
       Name for this job's compiler cache, unique per job and matrix entry
-      (e.g. "unit", "build-app_main-nrf54l15dk"). Jobs compile different
+      (e.g. "unit", "build-app_main-xiao_nrf54lm20a-release"). Jobs compile different
       things, so each keeps its own cache.
     required: true
 

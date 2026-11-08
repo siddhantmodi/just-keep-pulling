@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Sysbuild options. MCUboot on the XIAO only: native_sim builds have no bootloader.
+# Images are signed with MCUboot's development key unless SB_CONFIG_BOOT_SIGNATURE_KEY_FILE
+# names another (CI's release builds).
+
+choice BOOTLOADER
+	default BOOTLOADER_MCUBOOT if BOARD_XIAO_NRF54LM20A
+endchoice
+
+source "share/sysbuild/Kconfig"

@@ -1,12 +1,16 @@
 tests:
-  # Runs the real app_main on native_sim against a Bumble virtual central
-  # (pylib/zephyr_bumble). Needs requirements-test.txt and the plugin installed;
-  # west_setup.sh does both.
+  # Runs the real app_main (release build, plus logging, which the tests
+  # read) on native_sim against a Bumble virtual central acting as the Tindeq
+  # app and as a generic GATT client (pylib/zephyr_bumble). Needs
+  # requirements-test.txt and the plugin installed; west_setup.sh does both.
   app_main.integration:
+    extra_configs:
+      - CONFIG_LOG=y
     harness: pytest
     harness_config:
       pytest_root:
-        - "integration/test_ble_gatt.py"
+        - "integration/test_progressor.py"
+        - "integration/test_justkeeppulling.py"
     platform_allow:
       - native_sim
       - native_sim/native/64
